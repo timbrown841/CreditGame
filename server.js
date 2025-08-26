@@ -52,7 +52,7 @@ app.post("/register", async (req, res) => {
     if (!username || !email || !password)
       return res.status(400).send("All fields required");
 
-    const exists = await User.findOne({ username });
+    const exists = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (exists) return res.status(400).send("Username already exists");
 
     const hash = await bcrypt.hash(password, 10);
@@ -69,7 +69,7 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (!user) return res.status(404).send("User not found");
 
     const match = await bcrypt.compare(password, user.password);
@@ -87,7 +87,7 @@ app.post("/submit-score", async (req, res) => {
   const { username, score, level } = req.body;
 
   try {
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (!user) return res.status(404).send("User not found");
 
     user.scores.push({ score, level });
@@ -105,13 +105,27 @@ app.get("/results", async (req, res) => {
   const { username } = req.query;
 
   try {
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (!user) return res.status(404).send("User not found");
 
     res.json(user.scores || []);
   } catch (err) {
     console.error("Results error:", err);
     res.status(500).send("Failed to load results");
+  }
+});
+
+// Admin login
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+
+app.post("/admin/login", (req, res) => {
+  const { username, password } = req.body;
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    res.send("Admin login successful");
+  } else {
+    res.status(401).send("Invalid admin credentials");
   }
 });
 
@@ -123,6 +137,24 @@ app.get("/admin/all-results", async (req, res) => {
   } catch (err) {
     console.error("Admin results error:", err);
     res.status(500).send("Failed to load all results");
+  }
+});
+
+// Admin: reset a user's scores
+app.post("/admin/reset-scores", async (req, res) => {
+  const { username } = req.body;
+
+  try {
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
+    if (!user) return res.status(404).send("User not found");
+
+    user.scores = [];
+    await user.save();
+
+    res.send(`✅ Scores for ${user.username} have been reset.`);
+  } catch (err) {
+    console.error("Reset error:", err);
+    res.status(500).send("Failed to reset scores");
   }
 });
 
