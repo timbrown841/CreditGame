@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ MongoDB connection
 const mongoUri = process.env.MONGO_URI;
 
 if (!mongoUri || !mongoUri.startsWith("mongodb+srv://")) {
@@ -30,7 +29,7 @@ mongoose.connect(mongoUri, {
     process.exit(1);
   });
 
-// ✅ Schema
+// Schema
 const userSchema = new mongoose.Schema({
   username: String,
   email: String,
@@ -46,32 +45,30 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-// ✅ Registration
+// Register
 app.post("/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
     if (!username || !email || !password)
       return res.status(400).send("All fields required");
 
     const exists = await User.findOne({ username });
-    if (exists) return res.status(400).send("Username taken");
+    if (exists) return res.status(400).send("Username already exists");
 
     const hash = await bcrypt.hash(password, 10);
     await User.create({ username, email, password: hash });
 
-    res.send("Registered successfully");
+    res.send("User registered successfully");
   } catch (err) {
-    console.error("Register error:", err);
+    console.error("Registration error:", err);
     res.status(500).send("Registration failed");
   }
 });
 
-// ✅ Login
+// Login
 app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-
     const user = await User.findOne({ username });
     if (!user) return res.status(404).send("User not found");
 
@@ -85,7 +82,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// ✅ Submit Score
+// Submit score
 app.post("/submit-score", async (req, res) => {
   const { username, score, level } = req.body;
 
@@ -98,12 +95,12 @@ app.post("/submit-score", async (req, res) => {
 
     res.send("Score saved");
   } catch (err) {
-    console.error("Score save error:", err);
-    res.status(500).send("Failed to save score");
+    console.error("Score submission error:", err);
+    res.status(500).send("Could not save score");
   }
 });
 
-// ✅ Get scores for one user
+// User results
 app.get("/results", async (req, res) => {
   const { username } = req.query;
 
@@ -113,25 +110,25 @@ app.get("/results", async (req, res) => {
 
     res.json(user.scores || []);
   } catch (err) {
-    console.error("Error loading results:", err);
+    console.error("Results error:", err);
     res.status(500).send("Failed to load results");
   }
 });
 
-// ✅ Admin: Get all scores
+// Admin: all user results
 app.get("/admin/all-results", async (req, res) => {
   try {
     const users = await User.find({}, 'username scores');
     res.json(users);
   } catch (err) {
-    console.error("Admin load error:", err);
-    res.status(500).send("Failed to load admin results");
+    console.error("Admin results error:", err);
+    res.status(500).send("Failed to load all results");
   }
 });
 
-// ✅ Root health check
+// Root check
 app.get("/", (req, res) => {
-  res.send("🟢 API is running");
+  res.send("🟢 Credit Score Game API is running");
 });
 
 app.listen(PORT, () => {
