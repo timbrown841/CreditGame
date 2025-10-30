@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Results - Credit Score Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Player Results</h1>
+    <div id="resultsArea">Loading...</div>
+  </div>
+
+  <script>
+    const apiBase = "https://credit-api-uhou.onrender.com";
+    const username = localStorage.getItem("playerName");
+
+    fetch(`${apiBase}/results?username=${username}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.length) {
+          document.getElementById("resultsArea").textContent = "No scores recorded.";
+          return;
+        }
+
+        let html = "<ul>";
+        data.forEach(score => {
+          html += `<li>${score.date.slice(0, 10)} - Level: ${score.level} - Score: ${score.score}</li>`;
+        });
+        html += "</ul>";
+
+        document.getElementById("resultsArea").innerHTML = html;
+      })
+      .catch(err => {
+        document.getElementById("resultsArea").textContent = "Error loading results.";
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
