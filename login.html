@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - Credit Score Game</title>
+
+  <!-- Fredoka font -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome Back!</h1>
+    <p>Log in to continue your credit score journey!</p>
+
+    <form id="loginForm">
+      <input type="text" id="loginUsername" placeholder="Username" required /><br />
+      <input type="password" id="loginPassword" placeholder="Password" required /><br />
+      <button type="submit">Login</button>
+    </form>
+
+    <p>Don't have an account? <a href="register.html">Register here</a></p>
+  </div>
+
+  <script>
+    const apiBase = "https://credit-api-uhou.onrender.com";
+
+    document.getElementById("loginForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      // Convert username to lowercase
+      const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+      const password = document.getElementById("loginPassword").value;
+
+      if (!username || !password) {
+        alert("Please fill out all fields.");
+        return;
+      }
+
+      fetch(`${apiBase}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      })
+      .then(response => {
+        if (!response.ok) return response.text().then(text => { throw new Error(text); });
+        return response.json();
+      })
+      .then(data => {
+        localStorage.setItem("playerName", data.username);
+        alert("✅ Login successful!");
+        window.location.href = "index.html";
+      })
+      .catch(err => {
+        alert("❌ " + err.message);
+      });
+    });
+  </script>
+</body>
+</html>

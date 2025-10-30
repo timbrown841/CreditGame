@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - All Player Scores</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Player Score Dashboard</h1>
+    <p>Below are the scores submitted by players.</p>
+    <div id="adminResults">Loading results...</div>
+    <br />
+    <a href="index.html">⬅ Back to Main Menu</a>
+  </div>
+
+  <script>
+    const apiBase = "https://credit-api-uhou.onrender.com";
+
+    fetch(`${apiBase}/admin/all-results`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load admin results");
+        return res.json();
+      })
+      .then(data => {
+        let html = "";
+
+        data.forEach(user => {
+          html += `<h3>${user.username}</h3>`;
+
+          if (!user.scores || user.scores.length === 0) {
+            html += `<p>No scores yet.</p>`;
+          } else {
+            html += "<ul>";
+            user.scores.forEach(score => {
+              const date = new Date(score.date).toLocaleDateString();
+              html += `<li>${date} - Level: ${score.level} - Score: ${score.score}</li>`;
+            });
+            html += "</ul>";
+          }
+        });
+
+        document.getElementById("adminResults").innerHTML = html;
+      })
+      .catch(err => {
+        console.error("Admin Load Error:", err);
+        document.getElementById("adminResults").textContent = "Error loading results.";
+      });
+  </script>
+</body>
+</html>

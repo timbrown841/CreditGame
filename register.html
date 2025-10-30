@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Register - Credit Score Game</title>
+
+  <!-- Fredoka font -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Create Your Account</h1>
+    <p>Enter your details to start your credit score adventure!</p>
+
+    <form id="registerForm">
+      <input type="text" id="regUsername" placeholder="Username" required /><br />
+      <input type="email" id="regEmail" placeholder="Email" required /><br />
+      <input type="password" id="regPassword" placeholder="Password" required /><br />
+      <button type="submit">Register</button>
+    </form>
+
+    <p>Already have an account? <a href="login.html">Login here</a></p>
+  </div>
+
+  <script>
+    const apiBase = "https://credit-api-uhou.onrender.com";
+
+    document.getElementById("registerForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      // force username to lowercase
+      const username = document.getElementById("regUsername").value.trim().toLowerCase();
+      const email = document.getElementById("regEmail").value.trim();
+      const password = document.getElementById("regPassword").value;
+
+      if (!username || !email || !password) {
+        alert("Please fill out all fields.");
+        return;
+      }
+
+      fetch(`${apiBase}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password })
+      })
+      .then(response => {
+        if (!response.ok) return response.text().then(text => { throw new Error(text); });
+        return response.text();
+      })
+      .then(() => {
+        alert("✅ Registered successfully! Please login.");
+        window.location.href = "login.html";
+      })
+      .catch(err => {
+        alert("❌ " + err.message);
+      });
+    });
+  </script>
+</body>
+</html>
