@@ -1,18 +1,13 @@
 let container;
 
 // 🔐 Check registration and login session
-document.addEventListener("DOMContentLoaded", () => {
-  const registered = localStorage.getItem("playerUsername") &&
-                     localStorage.getItem("playerEmail") &&
-                     localStorage.getItem("playerPassword");
+  document.addEventListener("DOMContentLoaded", () => {
   const loggedIn = localStorage.getItem("playerName");
 
-  if (!registered) {
-    window.location.href = "register.html";
-  } else if (!loggedIn) {
-    window.location.href = "login.html";
+  if (!loggedIn) {
+    window.location.href = "login.html"; // Not logged in
   } else {
-    initQuizApp(loggedIn);
+    initQuizApp(loggedIn); // Safe to continue
   }
 });
 
