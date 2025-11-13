@@ -50,7 +50,7 @@
       .then(data => {
         localStorage.setItem("playerName", data.username);
         alert("✅ Login successful!");
-        window.location.href = "index.html";
+        window.location.href = "quickstart.html";
       })
       .catch(err => {
         alert("❌ " + err.message);
