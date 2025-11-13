@@ -3,39 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Credit Score Adventure</title>
-	<!-- Add this line below -->
+  <title>Credit Quest - Welcome</title>
+
+  <!-- Fredoka font -->
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Fredoka', sans-serif;
+    }
+
+    body {
+      background-image: url("bg-kids.jpg");
+      background-size: cover;
+      background-position: center;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: white;
+      padding: 20px;
+    }
+
+    .overlay {
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 40px;
+      border-radius: 20px;
+    }
+
+    h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+
+    p {
+      font-size: 1.2rem;
+      margin-bottom: 30px;
+    }
+
+    button {
+      font-size: 1rem;
+      padding: 12px 25px;
+      background-color: #4CAF50;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #388e3c;
+    }
+  </style>
 </head>
 <body>
-  <div class="container" id="loginContainer">
-    <h1>Welcome to Credit Score Adventure!</h1>
-    <p>Please enter your name to begin:</p>
-    <input type="text" id="playerName" placeholder="Your name" />
-    <br>
-    <button id="loginBtn" type="button">Login</button>
+  <div class="overlay">
+    <h1>Welcome to Credit Quest</h1>
+    <p>The UK's number one credit score learning platform for the youth</p>
+    <button onclick="window.location.href='register.html'">Start Your Journey</button>
   </div>
-
-  <div class="container" id="quizContainer" style="display: none;">
-    <div id="quizContent"></div>
-  </div>
-
-  <div id="trophyModal">
-    <h3>🏆 Trophy Unlocked!</h3>
-    <p>You earned a medal for your perfect score!</p>
-    <button type="button" onclick="closeTrophyModal()">Close</button>
-  </div>
-
-  <!-- Rocket + Trail -->
-  <img src="assets/rocket.png" class="rocket-fly" alt="rocket" />
-  <div class="rocket-trail"></div>
-
-  <!-- Stars -->
-  <div class="twinkle star1"></div>
-  <div class="twinkle star2"></div>
-  <div class="twinkle star3"></div>
-
-  <script src="script.js"></script>
 </body>
 </html>
