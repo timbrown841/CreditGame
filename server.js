@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema({
   username: String,
   email: String,
   password: String,
+  avatar: String, // ✅ NEW FIELD
   
   // ⭐ NEW: Avatar field
   avatar: {
