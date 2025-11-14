@@ -199,3 +199,32 @@ button[disabled] {
   from { transform: scale(0.5); opacity: 0.3; }
   to   { transform: scale(1); opacity: 1; }
 }
+
+.avatar-picker {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 15px 0;
+}
+
+.avatar-picker label {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.avatar-picker input {
+  display: none;
+}
+
+.avatar-picker img {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.avatar-picker input:checked + img {
+  border-color: #0077cc;
+  transform: scale(1.1);
+}
