@@ -18,6 +18,31 @@
       <input type="text" id="regUsername" placeholder="Username" required /><br />
       <input type="email" id="regEmail" placeholder="Email" required /><br />
       <input type="password" id="regPassword" placeholder="Password" required /><br />
+
+      <label for="avatar">Choose your avatar:</label>
+      <div class="avatar-picker">
+        <label>
+          <input type="radio" name="avatar" value="blackboy.png" checked />
+          <img src="assets/avatars/blackboy.png" alt="Avatar 1" />
+        </label>
+        <label>
+          <input type="radio" name="avatar" value="blackgirl.png" />
+          <img src="assets/avatars/blackgirl.png" alt="Avatar 2" />
+        </label>
+        <label>
+          <input type="radio" name="avatar" value="latinboy.png" />
+          <img src="assets/avatars/latinboy.png" alt="Avatar 3" />
+        </label>
+        <label>
+          <input type="radio" name="avatar" value="whiteboy.png" />
+          <img src="assets/avatars/whiteboy.png" alt="Avatar 4" />
+        </label>
+        <label>
+          <input type="radio" name="avatar" value="whitegirl.png" />
+          <img src="assets/avatars/whitegirl.png" alt="Avatar 5" />
+        </label>
+      </div>
+
       <button type="submit">Register</button>
     </form>
 
@@ -30,12 +55,12 @@
     document.getElementById("registerForm").addEventListener("submit", function(e) {
       e.preventDefault();
 
-      // force username to lowercase
       const username = document.getElementById("regUsername").value.trim().toLowerCase();
       const email = document.getElementById("regEmail").value.trim();
       const password = document.getElementById("regPassword").value;
+      const avatar = document.querySelector('input[name="avatar"]:checked').value;
 
-      if (!username || !email || !password) {
+      if (!username || !email || !password || !avatar) {
         alert("Please fill out all fields.");
         return;
       }
@@ -43,7 +68,7 @@
       fetch(`${apiBase}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password })
+        body: JSON.stringify({ username, email, password, avatar })
       })
       .then(response => {
         if (!response.ok) return response.text().then(text => { throw new Error(text); });
