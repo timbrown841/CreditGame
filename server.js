@@ -64,8 +64,13 @@ app.post("/register", async (req, res) => {
   try {
     const { username, email, password, avatar } = req.body;
 
-    if (!username || !email || !password)
-      return res.status(400).send("All fields required");
+    if (!username || !email || !password || !avatar)
+      return res.status(400).send("All fields including avatar are required");
+
+    const allowedAvatars = ["avatar1.png", "avatar2.png", "avatar3.png"];
+    if (!allowedAvatars.includes(avatar)) {
+      return res.status(400).send("Invalid avatar selected.");
+    }
 
     const exists = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (exists) return res.status(400).send("Username already exists");
@@ -76,7 +81,7 @@ app.post("/register", async (req, res) => {
       username,
       email,
       password: hash,
-      avatar: avatar || "avatar1.png"
+      avatar
     });
 
     res.send("User registered successfully");
