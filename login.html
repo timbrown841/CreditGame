@@ -49,6 +49,7 @@
       })
       .then(data => {
         localStorage.setItem("playerName", data.username);
+        localStorage.setItem("avatar", data.avatar); // ✅ Store avatar
         alert("✅ Login successful!");
         window.location.href = "quickstart.html";
       })
