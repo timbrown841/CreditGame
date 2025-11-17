@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <div class="container">
     <h1>Welcome Back!</h1>
@@ -29,7 +30,6 @@
     document.getElementById("loginForm").addEventListener("submit", function(e) {
       e.preventDefault();
 
-      // Convert username to lowercase
       const username = document.getElementById("loginUsername").value.trim().toLowerCase();
       const password = document.getElementById("loginPassword").value;
 
@@ -44,13 +44,20 @@
         body: JSON.stringify({ username, password })
       })
       .then(response => {
-        if (!response.ok) return response.text().then(text => { throw new Error(text); });
+        if (!response.ok) return response.text()
+          .then(text => { throw new Error(text); });
         return response.json();
       })
       .then(data => {
+
+        // Save data for session
         localStorage.setItem("playerName", data.username);
-        localStorage.setItem("avatar", data.avatar); // ✅ Store avatar
+        localStorage.setItem("playerEmail", data.email);
+        localStorage.setItem("playerAvatar", data.avatar); // ✅ FIXED
+
         alert("✅ Login successful!");
+
+        // Redirect to quickstart page
         window.location.href = "quickstart.html";
       })
       .catch(err => {
