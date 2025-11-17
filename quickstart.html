@@ -42,5 +42,21 @@
 </div>
 
   <script src="script.js"></script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const name = localStorage.getItem("playerName");
+    const avatar = localStorage.getItem("playerAvatar");
+
+    if (name && avatar) {
+      document.getElementById("displayName").textContent = name;
+      document.getElementById("avatarDisplay").src = `assets/avatars/${avatar}`;
+    } else {
+      // Redirect if not logged in
+      window.location.href = "login.html";
+    }
+  });
+</script>
+	
 </body>
 </html>
