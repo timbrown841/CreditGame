@@ -29,22 +29,12 @@ mongoose.connect(mongoUri, {
     process.exit(1);
   });
 
-
-// ======================
-// ⭐ USER SCHEMA
-// ======================
+// Schema
 const userSchema = new mongoose.Schema({
   username: String,
   email: String,
   password: String,
-  avatar: String, // ✅ NEW FIELD
-  
-  // ⭐ NEW: Avatar field
-  avatar: {
-    type: String,
-    default: "avatar1.png"
-  },
-
+  avatar: String,
   scores: [
     {
       level: String,
@@ -56,32 +46,34 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-
-// ======================
-// ⭐ REGISTER USER
-// ======================
+// Register
 app.post("/register", async (req, res) => {
   try {
     const { username, email, password, avatar } = req.body;
 
-    if (!username || !email || !password || !avatar)
-      return res.status(400).send("All fields including avatar are required");
-
-    const allowedAvatars = ["avatar1.png", "avatar2.png", "avatar3.png"];
-    if (!allowedAvatars.includes(avatar)) {
-      return res.status(400).send("Invalid avatar selected.");
-    }
+    if (!username || !email || !password)
+      return res.status(400).send("All fields required");
 
     const exists = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (exists) return res.status(400).send("Username already exists");
 
     const hash = await bcrypt.hash(password, 10);
 
+    const allowedAvatars = [
+      "blackboy.png",
+      "blackgirl.png",
+      "latinboy.png",
+      "whiteboy.png",
+      "whitegirl.png"
+    ];
+
+    const finalAvatar = allowedAvatars.includes(avatar) ? avatar : "blackboy.png";
+
     await User.create({
       username,
       email,
       password: hash,
-      avatar
+      avatar: finalAvatar
     });
 
     res.send("User registered successfully");
@@ -92,40 +84,24 @@ app.post("/register", async (req, res) => {
   }
 });
 
-
-// ======================
-// ⭐ LOGIN USER
-// returns username/email/avatar
-// ======================
+// Login
 app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-
-    const user = await User.findOne({
-      username: new RegExp(`^${username}$`, 'i')
-    });
-
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (!user) return res.status(404).send("User not found");
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).send("Incorrect password");
 
-    res.send({
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar   // ⭐ NEW
-    });
-
+    res.send({ username: user.username, email: user.email, avatar: user.avatar });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).send("Login failed");
   }
 });
 
-
-// ======================
-// ⭐ SAVE SCORE
-// ======================
+// Submit score
 app.post("/submit-score", async (req, res) => {
   const { username, score, level } = req.body;
 
@@ -137,17 +113,13 @@ app.post("/submit-score", async (req, res) => {
     await user.save();
 
     res.send("Score saved");
-
   } catch (err) {
     console.error("Score submission error:", err);
     res.status(500).send("Could not save score");
   }
 });
 
-
-// ======================
-// ⭐ GET USER RESULTS
-// ======================
+// User results
 app.get("/results", async (req, res) => {
   const { username } = req.query;
 
@@ -156,17 +128,13 @@ app.get("/results", async (req, res) => {
     if (!user) return res.status(404).send("User not found");
 
     res.json(user.scores || []);
-
   } catch (err) {
     console.error("Results error:", err);
     res.status(500).send("Failed to load results");
   }
 });
 
-
-// ======================
-// ⭐ ADMIN LOGIN
-// ======================
+// Admin login
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 
@@ -180,13 +148,10 @@ app.post("/admin/login", (req, res) => {
   }
 });
 
-
-// ======================
-// ⭐ ADMIN GET ALL USERS (includes avatars now)
-// ======================
+// Admin: all user results
 app.get("/admin/all-results", async (req, res) => {
   try {
-    const users = await User.find({}, 'username scores avatar');
+    const users = await User.find({}, 'username scores');
     res.json(users);
   } catch (err) {
     console.error("Admin results error:", err);
@@ -194,10 +159,7 @@ app.get("/admin/all-results", async (req, res) => {
   }
 });
 
-
-// ======================
-// ⭐ RESET USER SCORES
-// ======================
+// Admin: reset a user's scores
 app.post("/admin/reset-scores", async (req, res) => {
   const { username } = req.body;
 
@@ -209,19 +171,16 @@ app.post("/admin/reset-scores", async (req, res) => {
     await user.save();
 
     res.send(`✅ Scores for ${user.username} have been reset.`);
-
   } catch (err) {
     console.error("Reset error:", err);
     res.status(500).send("Failed to reset scores");
   }
 });
 
-
-// ROOT CHECK
+// Root check
 app.get("/", (req, res) => {
   res.send("🟢 Credit Score Game API is running");
 });
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
