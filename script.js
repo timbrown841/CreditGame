@@ -1,41 +1,85 @@
+// =============================
+//  CONFIG & GLOBALS
+// =============================
+const apiBase = "https://credit-api-uhou.onrender.com";
 let container;
 
-// 🔐 Check registration and login session
-  document.addEventListener("DOMContentLoaded", () => {
-  const loggedIn = localStorage.getItem("playerName");
+// =============================
+//  FETCH USER DATA FROM BACKEND
+// =============================
+document.addEventListener("DOMContentLoaded", () => {
+  const username = localStorage.getItem("playerName");
 
-  if (!loggedIn) {
-    window.location.href = "login.html"; // Not logged in
-  } else {
-    initQuizApp(loggedIn); // Safe to continue
+  if (!username) {
+    window.location.href = "login.html";
+    return;
   }
+
+  // Fetch user data from MongoDB (avatar + coins)
+  fetch(`${apiBase}/user-data?username=${username}`)
+    .then(res => {
+      if (!res.ok) throw new Error("Failed to load user data");
+      return res.json();
+    })
+    .then(data => {
+      // Store for later use
+      localStorage.setItem("playerAvatar", data.avatar);
+      localStorage.setItem("playerCoins", data.coins);
+
+      // Update UI on quickstart.html
+      const avatarImg = document.getElementById("avatarDisplay");
+      const displayName = document.getElementById("displayName");
+      const coinDisplay = document.getElementById("coinDisplay");
+
+      if (avatarImg) avatarImg.src = `assets/avatars/${data.avatar}`;
+      if (displayName) displayName.textContent = username;
+      if (coinDisplay) coinDisplay.textContent = `💰 Coins: ${data.coins}`;
+
+      initQuizApp(username);
+    })
+    .catch(err => {
+      console.error("User data error:", err);
+      alert("❌ Failed to load user data. Redirecting to login.");
+      window.location.href = "login.html";
+    });
 });
 
+// =============================
+//  QUIZ INITIALISATION
+// =============================
 function initQuizApp(name) {
-  document.getElementById("loginContainer")?.remove();
-  document.getElementById("quizContainer").style.display = "block";
+  const loginContainer = document.getElementById("loginContainer");
+  if (loginContainer) loginContainer.remove();
+
+  const quizContainer = document.getElementById("quizContainer");
+  if (quizContainer) quizContainer.style.display = "block";
+
   container = document.getElementById("quizContent");
   showIntroModule();
 }
 
+// =============================
+//  USER CONTROLS
+// =============================
 function logoutUser() {
   localStorage.removeItem("playerName");
+  localStorage.removeItem("playerAvatar");
+  localStorage.removeItem("playerCoins");
   window.location.href = "login.html";
 }
 
 function forgotPassword() {
-  const email = localStorage.getItem("playerEmail");
-  if (email) {
-    alert(`📩 A reset link would be sent to: ${email}`);
-  } else {
-    alert("No email on record. Please register first.");
-  }
+  alert("Password reset is not available yet.");
 }
 
+// =============================
+//  SOUND & MUSIC
+// =============================
 const soundCorrect = new Audio("assets/sounds/correct.mp3");
 const soundWrong = new Audio("assets/sounds/wrong.mp3");
 const soundWin = new Audio("assets/sounds/win.mp3");
 const bgMusic = new Audio("assets/sounds/background.mp3");
+
 bgMusic.loop = true;
 bgMusic.volume = 0.4;
 
@@ -46,6 +90,9 @@ function toggleMusic() {
   alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`);
 }
 
+// =============================
+//  QUIZ QUESTIONS
+// =============================
 const quizLevels = {
   easy: [
     {
@@ -97,19 +144,30 @@ const quizLevels = {
   ]
 };
 
+// =============================
+//  QUIZ STATE
+// =============================
 let unlockedLevels = JSON.parse(localStorage.getItem("unlockedLevels")) || {
-  easy: true, medium: false, hard: false
+  easy: true,
+  medium: false,
+  hard: false
 };
 
 let levelTrophies = JSON.parse(localStorage.getItem("levelTrophies")) || {
-  easy: false, medium: false, hard: false
+  easy: false,
+  medium: false,
+  hard: false
 };
 
 let correctAnswers = 0;
 let currentLevel = "easy";
 
+// =============================
+//  INTRO MODULE
+// =============================
 function showIntroModule() {
   const name = localStorage.getItem("playerName") || "Player";
+
   container.innerHTML = `
     <h2>Hi ${name} 👋</h2>
     <p>Choose your level:</p>
@@ -117,13 +175,16 @@ function showIntroModule() {
     <button onclick="startQuiz('medium')" ${unlockedLevels.medium ? "" : "disabled"}>🟡 Medium ${levelTrophies.medium ? "🏆" : ""}</button>
     <button onclick="startQuiz('hard')" ${unlockedLevels.hard ? "" : "disabled"}>🔴 Hard ${levelTrophies.hard ? "🏆" : ""}</button>
     <hr>
-    <a href="learning.html"><button type="button">📘 Learn About Credit Scores</button></a>
-    <a href="tips.html"><button type="button">💡 Credit Score Tips</button></a>
+    <a href="learning.html"><button>📘 Learn About Credit Scores</button></a>
+    <a href="tips.html"><button>💡 Credit Score Tips</button></a>
     <button onclick="toggleMusic()">🎵 Toggle Music</button>
     <button onclick="logoutUser()">🚪 Logout</button>
   `;
 }
 
+// =============================
+//  QUIZ ENGINE
+// =============================
 function startQuiz(level) {
   correctAnswers = 0;
   currentLevel = level;
@@ -144,7 +205,7 @@ function showQuestion(index) {
       <div class="quiz-question">
         <h2>Quiz Time!</h2>
         <p>${q.question}</p>
-        ${q.options.map((opt, i) => `<button type="button" class="optionBtn" data-index="${i}">${opt}</button>`).join("")}
+        ${q.options.map((opt, i) => `<button class="optionBtn" data-index="${i}">${opt}</button>`).join("")}
       </div>
     </div>
   `;
@@ -171,6 +232,9 @@ function showQuestion(index) {
   });
 }
 
+// =============================
+//  QUIZ SUMMARY
+// =============================
 function showQuizSummary() {
   const total = quizLevels[currentLevel].length;
   const stars = "⭐".repeat(correctAnswers) + "☆".repeat(total - correctAnswers);
@@ -197,6 +261,9 @@ function showQuizSummary() {
   `;
 }
 
+// =============================
+//  LEVEL UNLOCK + TROPHIES
+// =============================
 function unlockNextLevel(level) {
   if (!levelTrophies[level]) {
     levelTrophies[level] = true;
@@ -205,6 +272,7 @@ function unlockNextLevel(level) {
   }
   if (level === "easy") unlockedLevels.medium = true;
   if (level === "medium") unlockedLevels.hard = true;
+
   localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
 }
 
@@ -212,6 +280,9 @@ function restartQuiz() {
   showIntroModule();
 }
 
+// =============================
+//  TROPHY MODAL + CONFETTI
+// =============================
 function showTrophyModal() {
   document.getElementById("trophyModal").style.display = "block";
   if (musicOn) soundWin.play();
