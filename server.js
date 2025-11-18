@@ -74,7 +74,8 @@ app.post("/register", async (req, res) => {
       username,
       email,
       password: hash,
-      avatar: finalAvatar
+      avatar: finalAvatar,
+      coins: 0
     });
 
     res.send("User registered successfully");
@@ -95,7 +96,12 @@ app.post("/login", async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).send("Incorrect password");
 
-    res.send({ username: user.username, email: user.email, avatar: user.avatar });
+    res.send({
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar,
+      coins: user.coins || 0
+    });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).send("Login failed");
@@ -120,22 +126,24 @@ app.post("/submit-score", async (req, res) => {
   }
 });
 
-
-// Get User data coins
+// Get user data (avatar + coins)
 app.get("/user-data", async (req, res) => {
   const { username } = req.query;
   try {
     const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
     if (!user) return res.status(404).send("User not found");
 
-    res.send({ coins: user.coins || 0, avatar: user.avatar || "avatar1.png" });
+    res.send({
+      coins: user.coins || 0,
+      avatar: user.avatar || "blackboy.png"
+    });
   } catch (err) {
     console.error("User data fetch error:", err);
     res.status(500).send("Failed to fetch user data");
   }
 });
 
-// Coin Rewards
+// Reward coins (e.g. after quiz win)
 app.post("/reward-coins", async (req, res) => {
   const { username, amount } = req.body;
 
@@ -156,7 +164,6 @@ app.post("/reward-coins", async (req, res) => {
     res.status(500).send("Failed to reward coins");
   }
 });
-
 
 // User results
 app.get("/results", async (req, res) => {
@@ -216,7 +223,7 @@ app.post("/admin/reset-scores", async (req, res) => {
   }
 });
 
-// Root check
+// Health check
 app.get("/", (req, res) => {
   res.send("🟢 Credit Score Game API is running");
 });
