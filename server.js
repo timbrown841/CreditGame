@@ -21,12 +21,14 @@ if (!mongoUri || !mongoUri.startsWith("mongodb+srv://")) {
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => {
-  console.log("✅ Connected to MongoDB Atlas");
-}).catch(err => {
-  console.error("❌ MongoDB connection error:", err);
-  process.exit(1);
-});
+}).then(async () => {
+  await User.updateMany(
+    { coins: { $exists: false } }, // only update if coins doesn't exist
+    { $set: { coins: 0 } }
+  );
+  console.log("✅ Coins field added to existing users.");
+})();
+
 
 // ======================
 // SCHEMA
