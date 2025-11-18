@@ -6,6 +6,7 @@ const apiBase = "https://credit-api-uhou.onrender.com";
 document.addEventListener("DOMContentLoaded", () => {
   const username = localStorage.getItem("playerName");
   const avatar = localStorage.getItem("playerAvatar");
+  const coins = localStorage.getItem("playerCoins");
 
   if (!username || !avatar) {
     window.location.href = "login.html";
