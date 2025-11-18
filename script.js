@@ -9,15 +9,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const coins = localStorage.getItem("playerCoins");
 
   if (!name || !avatar) {
-    window.location.href = "login.html"; // not logged in
+    window.location.href = "login.html"; // Not logged in
     return;
   }
 
-  // Update UI
+  // Set UI elements
   document.getElementById("displayName").textContent = `Welcome, ${name}!`;
   document.getElementById("avatarDisplay").src = `assets/avatars/${avatar}`;
   document.getElementById("coinDisplay").textContent = `💰 Coins: ${coins}`;
 
+  // ✅ Hide login container and show quiz
+  document.getElementById("loginContainer")?.remove();
+  document.getElementById("quizContainer").style.display = "block";
+
+  // Start app
   initQuizApp(name);
 });
 
