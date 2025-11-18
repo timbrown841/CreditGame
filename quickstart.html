@@ -48,6 +48,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     const name = localStorage.getItem("playerName");
     const avatar = localStorage.getItem("playerAvatar");
+	const coins = localStorage.getItem("coins");
 
     if (name && avatar) {
       document.getElementById("displayName").textContent = name;
