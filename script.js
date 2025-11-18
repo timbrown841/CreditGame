@@ -4,22 +4,23 @@ const apiBase = "https://credit-api-uhou.onrender.com";
 
 // 🔐 Check login
 document.addEventListener("DOMContentLoaded", () => {
-  const username = localStorage.getItem("playerName");
+  const name = localStorage.getItem("playerName");
   const avatar = localStorage.getItem("playerAvatar");
   const coins = localStorage.getItem("playerCoins");
 
-  if (!username || !avatar) {
-    window.location.href = "login.html";
-  } else {
-    fetch(`${apiBase}/user-data?username=${username}`)
-      .then(res => res.json())
-      .then(data => {
-        currentCoins = data.coins || 0;
-        document.getElementById("avatarDisplay").src = `assets/avatars/${avatar}`;
-        document.getElementById("displayName").textContent = username;
-        document.getElementById("coinCount").textContent = `🪙 Coins: ${currentCoins}`;
-        initQuizApp(username);
-      })
+  if (!name || !avatar) {
+    window.location.href = "login.html"; // not logged in
+    return;
+  }
+
+  // Update UI
+  document.getElementById("displayName").textContent = `Welcome, ${name}!`;
+  document.getElementById("avatarDisplay").src = `assets/avatars/${avatar}`;
+  document.getElementById("coinDisplay").textContent = `💰 Coins: ${coins}`;
+
+  initQuizApp(name);
+});
+
       .catch(() => {
         alert("Error loading user data.");
         window.location.href = "login.html";
