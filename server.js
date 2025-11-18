@@ -35,6 +35,7 @@ const userSchema = new mongoose.Schema({
   email: String,
   password: String,
   avatar: String,
+  coins: { type: Number, default: 0 },
   scores: [
     {
       level: String,
@@ -118,6 +119,44 @@ app.post("/submit-score", async (req, res) => {
     res.status(500).send("Could not save score");
   }
 });
+
+
+// Get User data coins
+app.get("/user-data", async (req, res) => {
+  const { username } = req.query;
+  try {
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
+    if (!user) return res.status(404).send("User not found");
+
+    res.send({ coins: user.coins || 0, avatar: user.avatar || "avatar1.png" });
+  } catch (err) {
+    console.error("User data fetch error:", err);
+    res.status(500).send("Failed to fetch user data");
+  }
+});
+
+// Coin Rewards
+app.post("/reward-coins", async (req, res) => {
+  const { username, amount } = req.body;
+
+  if (!username || typeof amount !== "number") {
+    return res.status(400).send("Username and valid amount are required");
+  }
+
+  try {
+    const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
+    if (!user) return res.status(404).send("User not found");
+
+    user.coins = (user.coins || 0) + amount;
+    await user.save();
+
+    res.send({ message: "Coins rewarded", newBalance: user.coins });
+  } catch (err) {
+    console.error("Reward error:", err);
+    res.status(500).send("Failed to reward coins");
+  }
+});
+
 
 // User results
 app.get("/results", async (req, res) => {
