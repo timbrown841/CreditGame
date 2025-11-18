@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login - Credit Score Game</title>
 
-  <!-- Fredoka font -->
+  <!-- Fonts and styles -->
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
   <div class="container">
     <h1>Welcome Back!</h1>
@@ -27,7 +26,7 @@
   <script>
     const apiBase = "https://credit-api-uhou.onrender.com";
 
-    document.getElementById("loginForm").addEventListener("submit", function(e) {
+    document.getElementById("loginForm").addEventListener("submit", function (e) {
       e.preventDefault();
 
       const username = document.getElementById("loginUsername").value.trim().toLowerCase();
@@ -43,27 +42,24 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
       })
-      .then(response => {
-        if (!response.ok) return response.text()
-          .then(text => { throw new Error(text); });
-        return response.json();
-      })
-      .then(data => {
+        .then(response => {
+          if (!response.ok) {
+            return response.text().then(text => { throw new Error(text); });
+          }
+          return response.json();
+        })
+        .then(data => {
+          // ✅ Store all relevant data
+          localStorage.setItem("playerName", data.username);
+          localStorage.setItem("playerAvatar", data.avatar);   // ✅ consistent key
+          localStorage.setItem("playerCoins", data.coins);     // ✅ coins value
 
-        // Save data for session
-        localStorage.setItem("playerName", data.username);
-        localStorage.setItem("playerEmail", data.email);
-        localStorage.setItem("playerAvatar", data.avatar); // ✅ FIXED
-        localStorage.setItem("playerCoins", data.coins);
-
-        alert("✅ Login successful!");
-
-        // Redirect to quickstart page
-        window.location.href = "quickstart.html";
-      })
-      .catch(err => {
-        alert("❌ " + err.message);
-      });
+          alert("✅ Login successful!");
+          window.location.href = "quickstart.html";
+        })
+        .catch(err => {
+          alert("❌ " + err.message);
+        });
     });
   </script>
 </body>
