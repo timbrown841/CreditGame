@@ -1,3 +1,5 @@
+/* File: style.css */
+
 /* General Reset */
 * {
   margin: 0;
@@ -160,33 +162,39 @@ button:hover {
   font-size: 1.2rem;
 }
 
-/* Rocket & Trail */
+/* Rocket & Trail (animated flight) */
 .rocket-fly {
   position: fixed;
-  bottom: 10px;
-  right: 10px;
+  bottom: 12vh;     /* lift off the bottom */
+  left: -80px;      /* start just off-screen on the left */
   width: 60px;
   z-index: 10;
+  animation: rocketAcross 10s linear infinite;
 }
 
 .rocket-trail {
   position: fixed;
-  bottom: 5px;
-  right: 20px;
+  bottom: calc(12vh - 5px);
+  left: -40px;      /* slightly behind the rocket */
   width: 20px;
   height: 40px;
   background: linear-gradient(#fff, transparent);
   opacity: 0.7;
-  animation: trail 0.4s infinite alternate;
+  animation: rocketAcross 10s linear infinite, trail 0.4s infinite alternate;
 }
 
 @keyframes trail {
-  from {
-    transform: scaleY(1);
-  }
-  to {
-    transform: scaleY(1.4);
-  }
+  from { transform: scaleY(1); }
+  to   { transform: scaleY(1.4); }
+}
+
+/* Path across the screen with a subtle arc + rotation */
+@keyframes rocketAcross {
+  0%   { transform: translateX(0) translateY(0) rotate(0deg); }
+  25%  { transform: translateX(35vw) translateY(-3vh) rotate(10deg); }
+  50%  { transform: translateX(70vw) translateY(-6vh) rotate(0deg); }
+  75%  { transform: translateX(100vw) translateY(-3vh) rotate(-5deg); }
+  100% { transform: translateX(120vw) translateY(0) rotate(0deg); }
 }
 
 /* Twinkle Stars */
