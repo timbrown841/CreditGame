@@ -1,61 +1,29 @@
 // File: script.js
-const apiBase = "https://credit-api-uhou.onrender.com";
 let container;
-let currentCoins = 0;
 
-document.addEventListener("DOMContentLoaded", initApp);
-
-// why: ensure quickstart shows quiz immediately, no name prompt
-async function initApp() {
-  const name = (localStorage.getItem("playerName") || "").trim();
-  const avatar = localStorage.getItem("playerAvatar");
-  const coinsLS = Number(localStorage.getItem("playerCoins") || 0);
-
-  // auth gate
-  if (!name || !avatar) {
+// Gate: require a session, then boot
+document.addEventListener("DOMContentLoaded", () => {
+  const loggedIn = (localStorage.getItem("playerName") || "").trim();
+  if (!loggedIn) {
     window.location.href = "login.html";
     return;
   }
+  initQuizApp(loggedIn);
+});
 
-  // wire basic UI if present
-  currentCoins = Number.isFinite(coinsLS) ? coinsLS : 0;
-  setText("displayName", `Welcome, ${name}!`);
-  setSrc("avatarDisplay", `assets/avatars/${avatar}`);
-  setText("coinDisplay", `Coins: ${currentCoins}`);
-
-  // show quiz container regardless of previous name step
+function initQuizApp(name) {
+  // remove any old name/login block if present; show quiz safely
+  document.getElementById("loginContainer")?.remove();
   const qc = document.getElementById("quizContainer");
   if (qc) qc.style.display = "block";
-  const lc = document.getElementById("loginContainer");
-  if (lc) lc.style.display = "none";
 
-  // non-blocking sync
-  syncUserData(name).catch(() => { /* ignore */ });
-
+  // fall back to body if quizContent is missing to avoid runtime errors
   container = document.getElementById("quizContent") || document.body;
   showIntroModule();
 }
 
-function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
-function setSrc(id, val){ const el = document.getElementById(id); if (el) el.src = val; }
-
-async function syncUserData(username) {
-  const res = await fetch(`${apiBase}/user-data?username=${encodeURIComponent(username)}`);
-  if (!res.ok) return;
-  const data = await res.json();
-
-  if (typeof data.coins === "number") {
-    currentCoins = data.coins;
-    localStorage.setItem("playerCoins", String(currentCoins));
-    setText("coinDisplay", `Coins: ${currentCoins}`);
-  }
-  if (data.avatar) {
-    localStorage.setItem("playerAvatar", data.avatar);
-    setSrc("avatarDisplay", `assets/avatars/${data.avatar}`);
-  }
-}
-
 function logoutUser() {
+  // clear all related keys to avoid stale state after relogin
   localStorage.removeItem("playerName");
   localStorage.removeItem("playerAvatar");
   localStorage.removeItem("playerCoins");
@@ -64,35 +32,94 @@ function logoutUser() {
   window.location.href = "login.html";
 }
 
-/* Sounds (play only after user action due to autoplay policies) */
+function forgotPassword() {
+  const email = localStorage.getItem("playerEmail");
+  alert(email ? `📩 A reset link would be sent to: ${email}` : "No email on record. Please register first.");
+}
+
+/* Sounds */
 const soundCorrect = new Audio("assets/sounds/correct.mp3");
 const soundWrong = new Audio("assets/sounds/wrong.mp3");
 const soundWin = new Audio("assets/sounds/win.mp3");
 const bgMusic = new Audio("assets/sounds/background.mp3");
-bgMusic.loop = true; bgMusic.volume = 0.4;
-let musicOn = false;
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+
+let musicOn = true;
 function toggleMusic() {
   musicOn = !musicOn;
-  if (musicOn) bgMusic.play(); else bgMusic.pause();
-  alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`);
+  musicOn ? bgMusic.play() : bgMusic.pause();
+  alert(`Music ${musicOn ? "On 🎵" : "Off 🔇"}`);
 }
 
-/* Minimal working quiz bank (adjust as you like) */
+/* Your original, better questions (unchanged) */
 const quizLevels = {
   easy: [
-    { question: "Which habit helps your credit score most?", options: ["Pay on time", "Max out cards", "Ignore bills"], correct: 0, learnId: "on-time-payments" },
-    { question: "Recommended utilisation range?", options: ["10–30%", "60–80%", "100%"], correct: 0, learnId: "utilisation" }
+    {
+      question: "What does a credit score tell people?",
+      options: ["How fast you can run", "How good you are with money", "What school you go to"],
+      correct: 1,
+      learnId: "what-is-credit-score"
+    },
+    {
+      question: "Which is a good money habit?",
+      options: ["Always paying bills on time", "Spending all your money", "Losing your wallet"],
+      correct: 0,
+      learnId: "good-money-habit"
+    }
   ],
   medium: [
-    { question: "Multiple hard checks in a short time can…", options: ["Lower your score a bit", "Raise it", "No effect"], correct: 0 }
+    {
+      question: "What happens if you forget to pay your phone bill?",
+      options: ["Nothing changes", "Your credit score might go down", "You get a prize"],
+      correct: 1,
+      learnId: "missed-bills"
+    },
+    {
+      question: "Who checks your credit score?",
+      options: ["Your friends", "Banks and lenders", "Your teacher"],
+      correct: 1,
+      learnId: "who-checks-score"
+    }
   ],
   hard: [
-    { question: "Closing your oldest card often…", options: ["Can reduce average age", "Always boosts score", "Never matters"], correct: 0 }
+    {
+      question: "How can you build a good credit score?",
+      options: ["Never pay it back", "Pay bills on time", "Buy games"],
+      correct: 1,
+      learnId: "build-good-score"
+    },
+    {
+      question: "What number is a high credit score in the UK?",
+      options: ["100", "999", "5000"],
+      correct: 1,
+      learnId: "high-score-number"
+    },
+    {
+      question: "Which one is a bad money habit?",
+      options: ["Paying late", "Saving monthly", "Checking statements"],
+      correct: 0,
+      learnId: "bad-habits"
+    }
   ]
 };
 
-let unlockedLevels = JSON.parse(localStorage.getItem("unlockedLevels") || '{"easy":true,"medium":false,"hard":false}');
-let levelTrophies = JSON.parse(localStorage.getItem("levelTrophies") || '{"easy":false,"medium":false,"hard":false}');
+/* State with safe first-run persistence */
+let unlockedLevels =
+  JSON.parse(localStorage.getItem("unlockedLevels") || "null") ??
+  { easy: true, medium: false, hard: false };
+let levelTrophies =
+  JSON.parse(localStorage.getItem("levelTrophies") || "null") ??
+  { easy: false, medium: false, hard: false };
+
+// Persist defaults immediately if first-run
+if (!localStorage.getItem("unlockedLevels")) {
+  localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
+}
+if (!localStorage.getItem("levelTrophies")) {
+  localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
+}
+
 let correctAnswers = 0;
 let currentLevel = "easy";
 
@@ -104,8 +131,7 @@ function showIntroModule() {
     <button onclick="startQuiz('easy')">🟢 Easy ${levelTrophies.easy ? "🏆" : ""}</button>
     <button onclick="startQuiz('medium')" ${unlockedLevels.medium ? "" : "disabled"}>🟡 Medium ${levelTrophies.medium ? "🏆" : ""}</button>
     <button onclick="startQuiz('hard')" ${unlockedLevels.hard ? "" : "disabled"}>🔴 Hard ${levelTrophies.hard ? "🏆" : ""}</button>
-    <p id="coinCount">🪙 Coins: ${currentCoins}</p>
-    <hr/>
+    <hr>
     <a href="learning.html"><button type="button">📘 Learn About Credit Scores</button></a>
     <a href="tips.html"><button type="button">💡 Credit Score Tips</button></a>
     <button onclick="toggleMusic()">🎵 Toggle Music</button>
@@ -126,6 +152,10 @@ function showQuestion(index) {
   container.innerHTML = `
     <div class="score-tracker">Score: ${"⭐".repeat(correctAnswers)}${"☆".repeat(qList.length - correctAnswers)}</div>
     <div class="quiz-layout">
+      <div class="charlie">
+        <img src="assets/charlie.png" alt="Charlie the Coin"/>
+        <div class="speech">Let's go! Answer this question 🪙</div>
+      </div>
       <div class="quiz-question">
         <h2>Quiz Time!</h2>
         <p>${q.question}</p>
@@ -146,7 +176,7 @@ function showQuestion(index) {
         alert("✅ Correct!");
       } else {
         if (musicOn) soundWrong.play();
-        alert(`❌ Correct: ${q.options[q.correct]}${q.learnId ? "\nOpen learning page for more." : ""}`);
+        alert(`❌ Correct: ${q.options[q.correct]}\nClick OK to learn why.`);
         if (q.learnId) window.open(`learning.html#${q.learnId}`, "_blank");
       }
 
@@ -162,14 +192,11 @@ function showQuizSummary() {
 
   let msg = "";
   if (correctAnswers === total) {
-    msg = "🎉 Perfect score!";
-    showTrophyModal();
+    msg = "🎉 You're a credit score champ!";
+    triggerConfetti();
     unlockNextLevel(currentLevel);
-    awardCoins(10);
-    if (musicOn) soundWin.play();
   } else if (correctAnswers >= Math.floor(total * 0.7)) {
     msg = "👏 Great job!";
-    awardCoins(5);
   } else {
     msg = "🧐 Keep practicing!";
   }
@@ -179,46 +206,49 @@ function showQuizSummary() {
       <h2>Quiz Complete!</h2>
       <p class="animated-stars">Your Score: ${stars}</p>
       <p>${msg}</p>
-      <button onclick="startQuiz('${currentLevel}')">🔁 Try Again</button>
+      <button onclick="restartQuiz()">🔁 Play Again</button>
       <button onclick="showIntroModule()">🔙 Back to Menu</button>
     </div>
   `;
-}
-
-async function awardCoins(amount) {
-  currentCoins += amount;
-  setText("coinCount", `🪙 Coins: ${currentCoins}`);
-  setText("coinDisplay", `Coins: ${currentCoins}`);
-  localStorage.setItem("playerCoins", String(currentCoins));
-
-  try {
-    await fetch(`${apiBase}/reward-coins`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: localStorage.getItem("playerName"), amount })
-    });
-  } catch {
-    // why: network failure should not block UI
-  }
 }
 
 function unlockNextLevel(level) {
   if (!levelTrophies[level]) {
     levelTrophies[level] = true;
     localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
+    showTrophyModal();
   }
   if (level === "easy") unlockedLevels.medium = true;
   if (level === "medium") unlockedLevels.hard = true;
   localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
 }
 
+function restartQuiz() {
+  showIntroModule();
+}
+
 function showTrophyModal() {
-  const el = document.getElementById("trophyModal");
-  if (!el) return;
-  el.style.display = "block";
+  const modal = document.getElementById("trophyModal");
+  if (!modal) return;
+  modal.style.display = "block";
+  if (musicOn) soundWin.play();
   setTimeout(closeTrophyModal, 4000);
 }
+
 function closeTrophyModal() {
-  const el = document.getElementById("trophyModal");
-  if (el) el.style.display = "none";
+  const modal = document.getElementById("trophyModal");
+  if (!modal) return;
+  modal.style.display = "none";
+}
+
+function triggerConfetti() {
+  for (let i = 0; i < 20; i++) {
+    const s = document.createElement("div");
+    s.className = "sparkle";
+    s.style.left = `${Math.random() * 100}vw`;
+    s.style.top = `${Math.random() * 40 + 20}vh`;
+    s.style.background = "gold";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
 }
