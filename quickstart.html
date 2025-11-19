@@ -1,23 +1,16 @@
+<!-- File: quickstart.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Credit Score Adventure</title>
-	<!-- Add this line below -->
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container" id="loginContainer">
-    <h1>Welcome to Credit Score Adventure!</h1>
-    <p>Please enter your name to begin:</p>
-    <input type="text" id="playerName" placeholder="Your name" />
-    <br>
-    <button id="loginBtn" type="button">Login</button>
-  </div>
-
-  <div class="container" id="quizContainer" style="display: none;">
+  <!-- Go straight to quiz; name prompt removed -->
+  <div class="container" id="quizContainer">
     <div id="quizContent"></div>
   </div>
 
@@ -37,5 +30,14 @@
   <div class="twinkle star3"></div>
 
   <script src="script.js"></script>
+  <script>
+    // why: ensure quiz shows even if older script.js expected a name step
+    document.addEventListener('DOMContentLoaded', function () {
+      var qc = document.getElementById('quizContainer');
+      if (qc) qc.style.display = 'block';
+      var lc = document.getElementById('loginContainer');
+      if (lc) lc.style.display = 'none';
+    });
+  </script>
 </body>
 </html>
