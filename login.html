@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login - Credit Score Game</title>
 
+  <!-- Redirect guard: if already logged in, skip to quickstart -->
+  <script>
+    (function () {
+      try {
+        const name = (localStorage.getItem('playerName') || '').trim();
+        const avatar = localStorage.getItem('playerAvatar');
+        if (name && avatar) {
+          window.location.replace('quickstart.html');
+        }
+      } catch (e) { /* ignore storage errors */ }
+    })();
+  </script>
+
   <!-- Fonts and styles -->
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
@@ -49,12 +62,11 @@
           return response.json();
         })
         .then(data => {
-          // ✅ Store all relevant data
+          // ✅ Store all relevant data for quickstart & guard
           localStorage.setItem("playerName", data.username);
-          localStorage.setItem("playerAvatar", data.avatar);   // ✅ consistent key
-          localStorage.setItem("playerCoins", data.coins);     // ✅ coins value
+          localStorage.setItem("playerAvatar", data.avatar);
+          localStorage.setItem("playerCoins", String(data.coins ?? 0));
 
-          alert("✅ Login successful!");
           window.location.href = "quickstart.html";
         })
         .catch(err => {
