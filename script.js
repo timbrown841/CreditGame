@@ -1,79 +1,98 @@
+// File: script.js
+const apiBase = "https://credit-api-uhou.onrender.com";
 let container;
 let currentCoins = 0;
-const apiBase = "https://credit-api-uhou.onrender.com";
 
-// 🔐 Check login
-document.addEventListener("DOMContentLoaded", () => {
-  const name = localStorage.getItem("playerName");
+document.addEventListener("DOMContentLoaded", initApp);
+
+// why: ensure quickstart shows quiz immediately, no name prompt
+async function initApp() {
+  const name = (localStorage.getItem("playerName") || "").trim();
   const avatar = localStorage.getItem("playerAvatar");
-  const coins = localStorage.getItem("playerCoins");
+  const coinsLS = Number(localStorage.getItem("playerCoins") || 0);
 
+  // auth gate
   if (!name || !avatar) {
-    window.location.href = "login.html"; // Not logged in
+    window.location.href = "login.html";
     return;
   }
 
-  // Set UI elements
-  document.getElementById("displayName").textContent = `Welcome, ${name}!`;
-  document.getElementById("avatarDisplay").src = `assets/avatars/${avatar}`;
-  document.getElementById("coinDisplay").textContent = `💰 Coins: ${coins}`;
+  // wire basic UI if present
+  currentCoins = Number.isFinite(coinsLS) ? coinsLS : 0;
+  setText("displayName", `Welcome, ${name}!`);
+  setSrc("avatarDisplay", `assets/avatars/${avatar}`);
+  setText("coinDisplay", `Coins: ${currentCoins}`);
 
-  // ✅ Hide login container and show quiz
-  document.getElementById("loginContainer")?.remove();
-  document.getElementById("quizContainer").style.display = "block";
+  // show quiz container regardless of previous name step
+  const qc = document.getElementById("quizContainer");
+  if (qc) qc.style.display = "block";
+  const lc = document.getElementById("loginContainer");
+  if (lc) lc.style.display = "none";
 
-  // Start app
-  initQuizApp(name);
-});
+  // non-blocking sync
+  syncUserData(name).catch(() => { /* ignore */ });
 
-      .catch(() => {
-        alert("Error loading user data.");
-        window.location.href = "login.html";
-      });
-  }
-});
-
-function initQuizApp(name) {
-  document.getElementById("loginContainer")?.remove();
-  document.getElementById("quizContainer").style.display = "block";
-  container = document.getElementById("quizContent");
+  container = document.getElementById("quizContent") || document.body;
   showIntroModule();
+}
+
+function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
+function setSrc(id, val){ const el = document.getElementById(id); if (el) el.src = val; }
+
+async function syncUserData(username) {
+  const res = await fetch(`${apiBase}/user-data?username=${encodeURIComponent(username)}`);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  if (typeof data.coins === "number") {
+    currentCoins = data.coins;
+    localStorage.setItem("playerCoins", String(currentCoins));
+    setText("coinDisplay", `Coins: ${currentCoins}`);
+  }
+  if (data.avatar) {
+    localStorage.setItem("playerAvatar", data.avatar);
+    setSrc("avatarDisplay", `assets/avatars/${data.avatar}`);
+  }
 }
 
 function logoutUser() {
   localStorage.removeItem("playerName");
   localStorage.removeItem("playerAvatar");
+  localStorage.removeItem("playerCoins");
+  localStorage.removeItem("unlockedLevels");
+  localStorage.removeItem("levelTrophies");
   window.location.href = "login.html";
 }
 
+/* Sounds (play only after user action due to autoplay policies) */
 const soundCorrect = new Audio("assets/sounds/correct.mp3");
 const soundWrong = new Audio("assets/sounds/wrong.mp3");
 const soundWin = new Audio("assets/sounds/win.mp3");
 const bgMusic = new Audio("assets/sounds/background.mp3");
-bgMusic.loop = true;
-bgMusic.volume = 0.4;
-
-let musicOn = true;
+bgMusic.loop = true; bgMusic.volume = 0.4;
+let musicOn = false;
 function toggleMusic() {
   musicOn = !musicOn;
-  musicOn ? bgMusic.play() : bgMusic.pause();
+  if (musicOn) bgMusic.play(); else bgMusic.pause();
   alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`);
 }
 
+/* Minimal working quiz bank (adjust as you like) */
 const quizLevels = {
-  easy: [/* questions */],
-  medium: [/* questions */],
-  hard: [/* questions */]
+  easy: [
+    { question: "Which habit helps your credit score most?", options: ["Pay on time", "Max out cards", "Ignore bills"], correct: 0, learnId: "on-time-payments" },
+    { question: "Recommended utilisation range?", options: ["10–30%", "60–80%", "100%"], correct: 0, learnId: "utilisation" }
+  ],
+  medium: [
+    { question: "Multiple hard checks in a short time can…", options: ["Lower your score a bit", "Raise it", "No effect"], correct: 0 }
+  ],
+  hard: [
+    { question: "Closing your oldest card often…", options: ["Can reduce average age", "Always boosts score", "Never matters"], correct: 0 }
+  ]
 };
 
-let unlockedLevels = JSON.parse(localStorage.getItem("unlockedLevels")) || {
-  easy: true, medium: false, hard: false
-};
-
-let levelTrophies = JSON.parse(localStorage.getItem("levelTrophies")) || {
-  easy: false, medium: false, hard: false
-};
-
+let unlockedLevels = JSON.parse(localStorage.getItem("unlockedLevels") || '{"easy":true,"medium":false,"hard":false}');
+let levelTrophies = JSON.parse(localStorage.getItem("levelTrophies") || '{"easy":false,"medium":false,"hard":false}');
 let correctAnswers = 0;
 let currentLevel = "easy";
 
@@ -86,7 +105,7 @@ function showIntroModule() {
     <button onclick="startQuiz('medium')" ${unlockedLevels.medium ? "" : "disabled"}>🟡 Medium ${levelTrophies.medium ? "🏆" : ""}</button>
     <button onclick="startQuiz('hard')" ${unlockedLevels.hard ? "" : "disabled"}>🔴 Hard ${levelTrophies.hard ? "🏆" : ""}</button>
     <p id="coinCount">🪙 Coins: ${currentCoins}</p>
-    <hr>
+    <hr/>
     <a href="learning.html"><button type="button">📘 Learn About Credit Scores</button></a>
     <a href="tips.html"><button type="button">💡 Credit Score Tips</button></a>
     <button onclick="toggleMusic()">🎵 Toggle Music</button>
@@ -107,10 +126,6 @@ function showQuestion(index) {
   container.innerHTML = `
     <div class="score-tracker">Score: ${"⭐".repeat(correctAnswers)}${"☆".repeat(qList.length - correctAnswers)}</div>
     <div class="quiz-layout">
-      <div class="charlie">
-        <img src="assets/charlie.png" alt="Charlie the Coin"/>
-        <div class="speech">Let's go! Answer this question 🪙</div>
-      </div>
       <div class="quiz-question">
         <h2>Quiz Time!</h2>
         <p>${q.question}</p>
@@ -122,7 +137,7 @@ function showQuestion(index) {
   document.querySelectorAll(".optionBtn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       document.querySelectorAll(".optionBtn").forEach(b => b.disabled = true);
-      const selected = parseInt(e.target.dataset.index);
+      const selected = parseInt(e.target.dataset.index, 10);
       const isCorrect = selected === q.correct;
 
       if (isCorrect) {
@@ -131,7 +146,7 @@ function showQuestion(index) {
         alert("✅ Correct!");
       } else {
         if (musicOn) soundWrong.play();
-        alert(`❌ Correct: ${q.options[q.correct]}\nClick OK to learn why.`);
+        alert(`❌ Correct: ${q.options[q.correct]}${q.learnId ? "\nOpen learning page for more." : ""}`);
         if (q.learnId) window.open(`learning.html#${q.learnId}`, "_blank");
       }
 
@@ -147,13 +162,14 @@ function showQuizSummary() {
 
   let msg = "";
   if (correctAnswers === total) {
-    msg = "🎉 You're a credit score champ!";
-    triggerConfetti();
+    msg = "🎉 Perfect score!";
+    showTrophyModal();
     unlockNextLevel(currentLevel);
-    awardCoins(10); // reward for perfect score
+    awardCoins(10);
+    if (musicOn) soundWin.play();
   } else if (correctAnswers >= Math.floor(total * 0.7)) {
     msg = "👏 Great job!";
-    awardCoins(5); // partial reward
+    awardCoins(5);
   } else {
     msg = "🧐 Keep practicing!";
   }
@@ -163,59 +179,46 @@ function showQuizSummary() {
       <h2>Quiz Complete!</h2>
       <p class="animated-stars">Your Score: ${stars}</p>
       <p>${msg}</p>
-      <button onclick="restartQuiz()">🔁 Play Again</button>
+      <button onclick="startQuiz('${currentLevel}')">🔁 Try Again</button>
       <button onclick="showIntroModule()">🔙 Back to Menu</button>
     </div>
   `;
 }
 
-function awardCoins(amount) {
+async function awardCoins(amount) {
   currentCoins += amount;
-  document.getElementById("coinCount").textContent = `🪙 Coins: ${currentCoins}`;
+  setText("coinCount", `🪙 Coins: ${currentCoins}`);
+  setText("coinDisplay", `Coins: ${currentCoins}`);
+  localStorage.setItem("playerCoins", String(currentCoins));
 
-  fetch(`${apiBase}/add-coins`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: localStorage.getItem("playerName"),
-      coins: amount
-    })
-  }).catch(err => console.error("Coin update failed", err));
+  try {
+    await fetch(`${apiBase}/reward-coins`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: localStorage.getItem("playerName"), amount })
+    });
+  } catch {
+    // why: network failure should not block UI
+  }
 }
 
 function unlockNextLevel(level) {
   if (!levelTrophies[level]) {
     levelTrophies[level] = true;
     localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
-    showTrophyModal();
   }
   if (level === "easy") unlockedLevels.medium = true;
   if (level === "medium") unlockedLevels.hard = true;
   localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
 }
 
-function restartQuiz() {
-  showIntroModule();
-}
-
 function showTrophyModal() {
-  document.getElementById("trophyModal").style.display = "block";
-  if (musicOn) soundWin.play();
+  const el = document.getElementById("trophyModal");
+  if (!el) return;
+  el.style.display = "block";
   setTimeout(closeTrophyModal, 4000);
 }
-
 function closeTrophyModal() {
-  document.getElementById("trophyModal").style.display = "none";
-}
-
-function triggerConfetti() {
-  for (let i = 0; i < 20; i++) {
-    const s = document.createElement("div");
-    s.className = "sparkle";
-    s.style.left = `${Math.random() * 100}vw`;
-    s.style.top = `${Math.random() * 40 + 20}vh`;
-    s.style.background = "gold";
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 1000);
-  }
+  const el = document.getElementById("trophyModal");
+  if (el) el.style.display = "none";
 }
