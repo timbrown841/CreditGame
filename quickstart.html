@@ -35,28 +35,7 @@
   <div class="twinkle star1"></div>
   <div class="twinkle star2"></div>
   <div class="twinkle star3"></div>
-	
-<div class="avatar-container">
-  <h3>Welcome, <span id="displayName"></span>!</h3>
-  <img id="avatarDisplay" src="" alt="Your Avatar" class="avatar-image" />
-</div>
 
   <script src="script.js"></script>
-
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const name = localStorage.getItem("playerName");
-    const avatar = localStorage.getItem("playerAvatar");
-
-    if (name && avatar) {
-      document.getElementById("displayName").textContent = name;
-      document.getElementById("avatarDisplay").src = `assets/avatars/${avatar}`;
-    } else {
-      // Redirect if not logged in
-      window.location.href = "login.html";
-    }
-  });
-</script>
-	
 </body>
 </html>
