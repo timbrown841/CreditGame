@@ -39,5 +39,38 @@
       if (lc) lc.style.display = 'none';
     });
   </script>
+
+<!-- Paste near the end of quickstart.html, just before </body>. -->
+<div id="youthPrivacyOverlay" style="display:none; position:fixed; inset:0; z-index:2000; backdrop-filter: blur(2px);">
+  <div class="container" style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); max-width:520px; text-align:left;">
+    <h2 style="margin-bottom:8px;">Privacy for Young People</h2>
+    <p style="opacity:.95;">We collect only what’s needed to run the app: your username, avatar, quiz progress, and basic safety logs. We don’t access your credit report or your contacts. No targeted ads to children.</p>
+    <ul style="margin:10px 0 0 18px;">
+      <li>Your progress is saved on your device (localStorage) and in our database.</li>
+      <li>You and your parent/guardian can ask us to see, fix, or delete your data: <strong>hello@creditquest.co.uk</strong>.</li>
+      <li>Read the full policy for details.</li>
+    </ul>
+    <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button id="ypAckBtn">I understand</button>
+      <a href="privacy.html"><button type="button" style="background:#ffcd3c; color:#000;">Read full policy</button></a>
+    </div>
+  </div>
+</div>
+<script>
+  // Show once per device until acknowledged
+  (function () {
+    try {
+      if (localStorage.getItem('youthPrivacyAck') === '1') return;
+      var overlay = document.getElementById('youthPrivacyOverlay');
+      if (!overlay) return;
+      overlay.style.display = 'block';
+      document.getElementById('ypAckBtn')?.addEventListener('click', function () {
+        localStorage.setItem('youthPrivacyAck', '1');
+        overlay.style.display = 'none';
+      });
+    } catch (e) { /* ignore storage errors */ }
+  })();
+</script>
+  
 </body>
 </html>
