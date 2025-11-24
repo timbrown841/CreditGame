@@ -5,71 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cookies - Credit Quest</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Fredoka', sans-serif; }
-    body {
-      background-image: url("assets/bg-kids.jpg");
-      background-size: cover;
-      background-position: center;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .overlay {
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      padding: 20px;
-      border-radius: 15px;
-      width: 90%;
-      max-width: 500px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    h1 { font-size: 1.8rem; margin-bottom: 10px; }
-    p { font-size: 1rem; margin: 8px 0; line-height: 1.5; }
-    ul { text-align: left; margin: 10px 0 0 18px; }
-    li { margin: 6px 0; }
-    button {
-      font-size: 1rem;
-      padding: 12px 25px;
-      background-color: #4CAF50;
-      border: none;
-      border-radius: 10px;
-      color: white;
-      cursor: pointer;
-      transition: background 0.3s ease;
-      margin-top: 14px;
-    }
-    button:hover { background-color: #388e3c; }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="overlay">
+  <div class="container">
     <h1>Cookies</h1>
-<p>Cookies Policy
-Effective date: 20 November 2025
+	
+	<p><strong>Effective date:</strong> 20 November 2025</p>
+    <p><strong>Controller:</strong> DatNet Plus Ltd, 86-90 Paul Street, London, EC2A 4NE, Company No. 10935495.</p>
+    <p><strong>Contact:</strong> hello@creditquest.co.uk</p>
+	
+	<h2>Do we use cookies?</h2>
+    <ul class="list">
+		<li><strong>Right now, Credit Quest does not set non-essential cookies. The app relies primarily on localStorage to remember gameplay progress on your device.</li>
+	</ul>
+	
+	<h2>Essential storage</h2>
+    <ul class="list">
+		<li><strong>localStorage (essential): Saves gameplay state (e.g., coins, levels, trophies) so the app works smoothly. Clearing your browser storage will reset your in-app progress on that device.</li>
+	</ul>
 
-Do we use cookies?
-Right now, Credit Quest does not set non-essential cookies. The app relies primarily on localStorage to remember gameplay progress on your device.
+	<h2>Third-party services</h2>
+    <ul class="list">
+		<li><strong>Fonts: We load Google Fonts (Fredoka). Font delivery generally does not set cookies for end users but requires basic technical data (e.g., IP address) to serve the font.</li>
+		<li><strong>Hosting: GitHub Pages (frontend) and Render (backend) may place strictly necessary cookies for service delivery/security. We do not control these platforms’ cookies.</li>
+	</ul>
+	
+	<h2>Children & consent</h2>
+    <ul class="list">
+		<li><strong>We do not set analytics/marketing cookies for child users without consent.</li>
+		<li><strong>If we later introduce analytics, we will show a clear banner, obtain consent first, and let you change your preferences at any time.</li>
+	</ul>
+	
+	<h2>Managing cookies</h2>
+    <ul class="list">
+		<li><strong>You can control cookies and site data in your browser settings. Blocking all storage may affect how the app works.</li>
+	</ul>
+		
+	<h2>Contact</h2>
+    <ul class="list">
+		<li><strong>Questions about cookies? hello@creditquest.co.uk</li>
+	</ul>
 
-Essential storage
-• localStorage (essential): Saves gameplay state (e.g., coins, levels, trophies) so the app works smoothly. Clearing your browser storage will reset your in-app progress on that device.
-
-Third-party services
-• Fonts: We load Google Fonts (Fredoka). Font delivery generally does not set cookies for end users but requires basic technical data (e.g., IP address) to serve the font.
-• Hosting: GitHub Pages (frontend) and Render (backend) may place strictly necessary cookies for service delivery/security. We do not control these platforms’ cookies.
-
-Children & consent
-• We do not set analytics/marketing cookies for child users without consent.
-• If we later introduce analytics, we will show a clear banner, obtain consent first, and let you change your preferences at any time.
-
-Managing cookies
-You can control cookies and site data in your browser settings. Blocking all storage may affect how the app works.
-
-Contact
-Questions about cookies? hello@creditquest.co.uk</p>
     <button onclick="window.location.href='index.html'">Back</button>
+	
+<p style="margin-top:10px;">
+      <a href="about.html">About</a> ·
+      <a href="terms.html">Terms</a> ·
+      <a href="cookies.html">Cookies</a>
+    </p>
   </div>
 </body>
 </html>
