@@ -1,45 +1,62 @@
 // File: script.js
-let container;
+const apiBase = "https://credit-api-uhou.onrender.com";
 
-// Session gate + avatar/name header setup (drop-in replacement)
+const COINS_PER_CORRECT = 1;  // why: immediate feedback on each correct answer
+
+let container;
+let currentCoins = 0;
+
 document.addEventListener("DOMContentLoaded", () => {
   const name = (localStorage.getItem("playerName") || "").trim();
-  const avatar = localStorage.getItem("playerAvatar"); // e.g., "blackboy.png"
-
-  // Redirect if not logged in or no avatar chosen
+  const avatar = localStorage.getItem("playerAvatar");
   if (!name || !avatar) {
     window.location.href = "login.html";
     return;
   }
 
-  // Populate header UI if elements exist
+  // Coins from storage
+  currentCoins = Number(localStorage.getItem("playerCoins") || 0);
+  if (!Number.isFinite(currentCoins)) currentCoins = 0;
+
+  // Header UI (if present)
   const nameEl = document.getElementById("displayName");
   if (nameEl) nameEl.textContent = `Welcome, ${name}!`;
-
   const avatarEl = document.getElementById("avatarDisplay");
-  if (avatarEl) {
-    avatarEl.src = `assets/avatars/${avatar}`;
-    // Optional fallback if image missing:
-    // avatarEl.onerror = () => (avatarEl.src = "assets/avatars/default.png");
-  }
+  if (avatarEl) avatarEl.src = `assets/avatars/${avatar}`;
 
-  // Boot the quiz
-  initQuizApp(name);
-});
-
-function initQuizApp(name) {
-  // remove any old name/login block if present; show quiz safely
-  document.getElementById("loginContainer")?.remove();
   const qc = document.getElementById("quizContainer");
   if (qc) qc.style.display = "block";
+  document.getElementById("loginContainer")?.remove();
 
-  // fall back to body if quizContent is missing to avoid runtime errors
   container = document.getElementById("quizContent") || document.body;
+
+  updateCoinsUI();
   showIntroModule();
+});
+
+function updateCoinsUI() {
+  const d1 = document.getElementById("coinDisplay");
+  if (d1) d1.textContent = `Coins: ${currentCoins}`;
+  const d2 = document.getElementById("coinCount");
+  if (d2) d2.textContent = `🪙 Coins: ${currentCoins}`;
+}
+
+async function awardCoins(amount) {
+  currentCoins += amount;
+  localStorage.setItem("playerCoins", String(currentCoins));
+  updateCoinsUI();
+
+  // why: network errors must not break UX
+  try {
+    await fetch(`${apiBase}/reward-coins`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: localStorage.getItem("playerName"), amount })
+    });
+  } catch {}
 }
 
 function logoutUser() {
-  // clear all related keys to avoid stale state after relogin
   localStorage.removeItem("playerName");
   localStorage.removeItem("playerAvatar");
   localStorage.removeItem("playerCoins");
@@ -58,17 +75,16 @@ const soundCorrect = new Audio("assets/sounds/correct.mp3");
 const soundWrong = new Audio("assets/sounds/wrong.mp3");
 const soundWin = new Audio("assets/sounds/win.mp3");
 const bgMusic = new Audio("assets/sounds/background.mp3");
-bgMusic.loop = true;
-bgMusic.volume = 0.4;
+bgMusic.loop = true; bgMusic.volume = 0.4;
 
 let musicOn = true;
 function toggleMusic() {
   musicOn = !musicOn;
   musicOn ? bgMusic.play() : bgMusic.pause();
-  alert(`Music ${musicOn ? "On 🎵" : "Off 🔇"}`);
+  alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`);
 }
 
-/* Your original, better questions (unchanged) */
+/* Your better questions (unchanged) */
 const quizLevels = {
   easy: [
     {
@@ -120,7 +136,7 @@ const quizLevels = {
   ]
 };
 
-/* State with safe first-run persistence */
+/* State */
 let unlockedLevels =
   JSON.parse(localStorage.getItem("unlockedLevels") || "null") ??
   { easy: true, medium: false, hard: false };
@@ -128,13 +144,11 @@ let levelTrophies =
   JSON.parse(localStorage.getItem("levelTrophies") || "null") ??
   { easy: false, medium: false, hard: false };
 
-// Persist defaults immediately if first-run
-if (!localStorage.getItem("unlockedLevels")) {
+// Persist defaults on first-run
+if (!localStorage.getItem("unlockedLevels"))
   localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
-}
-if (!localStorage.getItem("levelTrophies")) {
+if (!localStorage.getItem("levelTrophies"))
   localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
-}
 
 let correctAnswers = 0;
 let currentLevel = "easy";
@@ -147,6 +161,7 @@ function showIntroModule() {
     <button onclick="startQuiz('easy')">🟢 Easy ${levelTrophies.easy ? "🏆" : ""}</button>
     <button onclick="startQuiz('medium')" ${unlockedLevels.medium ? "" : "disabled"}>🟡 Medium ${levelTrophies.medium ? "🏆" : ""}</button>
     <button onclick="startQuiz('hard')" ${unlockedLevels.hard ? "" : "disabled"}>🔴 Hard ${levelTrophies.hard ? "🏆" : ""}</button>
+    <p id="coinCount">🪙 Coins: ${currentCoins}</p>
     <hr>
     <a href="learning.html"><button type="button">📘 Learn About Credit Scores</button></a>
     <a href="tips.html"><button type="button">💡 Credit Score Tips</button></a>
@@ -189,7 +204,8 @@ function showQuestion(index) {
       if (isCorrect) {
         correctAnswers++;
         if (musicOn) soundCorrect.play();
-        alert("✅ Correct!");
+        awardCoins(COINS_PER_CORRECT); // award on each correct
+        alert("✅ Correct! +1 coin");
       } else {
         if (musicOn) soundWrong.play();
         alert(`❌ Correct: ${q.options[q.correct]}\nClick OK to learn why.`);
@@ -211,6 +227,7 @@ function showQuizSummary() {
     msg = "🎉 You're a credit score champ!";
     triggerConfetti();
     unlockNextLevel(currentLevel);
+    if (musicOn) soundWin.play();
   } else if (correctAnswers >= Math.floor(total * 0.7)) {
     msg = "👏 Great job!";
   } else {
@@ -222,7 +239,7 @@ function showQuizSummary() {
       <h2>Quiz Complete!</h2>
       <p class="animated-stars">Your Score: ${stars}</p>
       <p>${msg}</p>
-      <button onclick="restartQuiz()">🔁 Play Again</button>
+      <button onclick="startQuiz('${currentLevel}')">🔁 Try Again</button>
       <button onclick="showIntroModule()">🔙 Back to Menu</button>
     </div>
   `;
@@ -239,15 +256,10 @@ function unlockNextLevel(level) {
   localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
 }
 
-function restartQuiz() {
-  showIntroModule();
-}
-
 function showTrophyModal() {
   const modal = document.getElementById("trophyModal");
   if (!modal) return;
   modal.style.display = "block";
-  if (musicOn) soundWin.play();
   setTimeout(closeTrophyModal, 4000);
 }
 
