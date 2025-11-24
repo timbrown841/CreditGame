@@ -1,14 +1,30 @@
 // File: script.js
 let container;
 
-// Gate: require a session, then boot
+// Session gate + avatar/name header setup (drop-in replacement)
 document.addEventListener("DOMContentLoaded", () => {
-  const loggedIn = (localStorage.getItem("playerName") || "").trim();
-  if (!loggedIn) {
+  const name = (localStorage.getItem("playerName") || "").trim();
+  const avatar = localStorage.getItem("playerAvatar"); // e.g., "blackboy.png"
+
+  // Redirect if not logged in or no avatar chosen
+  if (!name || !avatar) {
     window.location.href = "login.html";
     return;
   }
-  initQuizApp(loggedIn);
+
+  // Populate header UI if elements exist
+  const nameEl = document.getElementById("displayName");
+  if (nameEl) nameEl.textContent = `Welcome, ${name}!`;
+
+  const avatarEl = document.getElementById("avatarDisplay");
+  if (avatarEl) {
+    avatarEl.src = `assets/avatars/${avatar}`;
+    // Optional fallback if image missing:
+    // avatarEl.onerror = () => (avatarEl.src = "assets/avatars/default.png");
+  }
+
+  // Boot the quiz
+  initQuizApp(name);
 });
 
 function initQuizApp(name) {
