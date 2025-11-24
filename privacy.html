@@ -5,119 +5,73 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Privacy Policy - Credit Quest</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Fredoka', sans-serif; }
-    body {
-      background-image: url("assets/bg-kids.jpg");
-      background-size: cover;
-      background-position: center;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .overlay {
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      padding: 20px;
-      border-radius: 15px;
-      width: 90%;
-      max-width: 500px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    h1 { font-size: 1.8rem; margin-bottom: 10px; }
-    p { font-size: 1rem; margin: 8px 0; line-height: 1.5; }
-    ul { text-align: left; margin: 10px 0 0 18px; }
-    li { margin: 6px 0; }
-    button {
-      font-size: 1rem;
-      padding: 12px 25px;
-      background-color: #4CAF50;
-      border: none;
-      border-radius: 10px;
-      color: white;
-      cursor: pointer;
-      transition: background 0.3s ease;
-      margin-top: 14px;
-    }
-    button:hover { background-color: #388e3c; }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="overlay">
+  <div class="container">
     <h1>Privacy Policy</h1>
-<p>Privacy Policy
-Effective date: 20 November 2025
 
-Who we are
-Controller: [LEGAL ENTITY] (“Credit Quest”, “we”, “us”, “our”).
-Registered office: [REGISTERED ADDRESS]. Company number: [COMPANY NUMBER].
-Contact: hello@creditquest.co.uk
-Supervisory authority: UK Information Commissioner’s Office (ICO).
+    <p><strong>Effective date:</strong> 20 November 2025</p>
+    <p><strong>Controller:</strong> [LEGAL ENTITY], [REGISTERED ADDRESS], Company No. [COMPANY NUMBER].</p>
+    <p><strong>Contact:</strong> hello@creditquest.co.uk</p>
 
-Summary
-• We collect only what we need to run Credit Quest: account details, gameplay progress, and essential service logs.
-• We do not access your credit report and do not sell personal data.
-• You can access, correct, or delete your data at any time.
+    <h2>Summary</h2>
+    <ul class="list">
+      <li>We collect only what we need to run Credit Quest: account details, gameplay progress, and essential logs.</li>
+      <li>We do not access your credit report and do not sell personal data.</li>
+      <li>You can access, correct, or delete your data at any time.</li>
+    </ul>
 
-What we collect
-1) Account data (you provide): username, email, password (hashed), chosen avatar.
-2) Gameplay data: quiz progress, levels unlocked, coins/trophies (also saved in your browser’s local storage).
-3) Service data: security and diagnostic logs (IP address, device/browser info, timestamps, error logs).
-4) Support data (if you contact us): message content and contact details.
-5) Cookies & local storage: no analytics/marketing cookies by default. We use localStorage for gameplay state. See Cookies Policy.
+    <h2>What we collect</h2>
+    <ol class="list">
+      <li><strong>Account data</strong>: username, email, password (hashed), chosen avatar.</li>
+      <li><strong>Gameplay data</strong>: progress, levels, coins/trophies (also saved in localStorage).</li>
+      <li><strong>Service data</strong>: basic logs for security/diagnostics.</li>
+      <li><strong>Support</strong>: messages you send us.</li>
+      <li><strong>Cookies/localStorage</strong>: no analytics/marketing by default; we use localStorage for gameplay. See Cookies Policy.</li>
+    </ol>
 
-Why we use your data (UK GDPR lawful bases)
-• Contract: to create your account, authenticate you, and provide the app.
-• Legitimate interests: secure our service (fraud/abuse prevention), fix bugs, and improve features in a privacy-protective way.
-• Consent: required for any non-essential cookies or optional communications (not used by default).
+    <h2>Lawful bases (UK GDPR)</h2>
+    <ul class="list">
+      <li><strong>Contract</strong>: create your account, authenticate, provide the app.</li>
+      <li><strong>Legitimate interests</strong>: security, fixing bugs, improving features.</li>
+      <li><strong>Consent</strong>: non-essential tools or comms (not used by default).</li>
+    </ul>
 
-Children & Young People
-• Who this is for: Credit Quest is designed for teens and young adults. If you are under 18, please read this with your parent or guardian. Children under 13 should use the service only with parent/guardian permission.
-• Data minimisation: we collect the minimum data needed to operate the app. We do not collect precise location, contacts, or credit reports.
-• High privacy by default:
-  – No targeted advertising to children.
-  – No profiling of children for marketing.
-  – No dark patterns that nudge children to lower privacy.
-  – Clear, age-appropriate explanations.
-• Parental involvement: Parents/guardians may ask for access, correction, or deletion of a child’s data via hello@creditquest.co.uk. We will verify the requester’s relationship before acting.
-• Communications: We limit emails to essential service messages (e.g., password resets). No marketing emails to children without appropriate consent.
+    <h2>Children & Young People</h2>
+    <ul class="list">
+      <li>Designed for teens/young adults; under-13s only with parent/guardian permission.</li>
+      <li>We minimise data; no precise location, no credit report access.</li>
+      <li>No targeted ads to children; no profiling for marketing; clear, age-appropriate explanations.</li>
+      <li>Parents/guardians can request access/correction/deletion: <strong>hello@creditquest.co.uk</strong>.</li>
+    </ul>
 
-Do we share data?
-We do not sell personal data. We use trusted processors to host and run the service:
-• GitHub Pages (frontend hosting),
-• Render (API infrastructure),
-• MongoDB Atlas (database).
-They act under contract, follow our instructions, and must protect the data.
+    <h2>Sharing & processors</h2>
+    <p>We don’t sell personal data. We use trusted providers (GitHub Pages, Render, MongoDB Atlas) under contract.</p>
 
-International transfers
-Where data is processed outside the UK, we use appropriate safeguards (e.g., UK International Data Transfer Agreement/Standard Contractual Clauses) and apply additional measures where required.
+    <h2>International transfers</h2>
+    <p>We use appropriate safeguards (e.g., IDTA/SCCs) where data is processed outside the UK.</p>
 
-Retention
-• Account & gameplay data: kept while your account is active; if inactive for 12 months, we may delete or anonymise.
-• Support messages: retained up to 24 months after resolution.
-• Logs: retained up to 12 months.
-We delete or anonymise data when it is no longer needed.
+    <h2>Retention</h2>
+    <ul class="list">
+      <li>Account/gameplay: while active; may delete/anonymise after 12 months of inactivity.</li>
+      <li>Support: up to 24 months after resolution. Logs: up to 12 months.</li>
+    </ul>
 
-Your rights
-You (or your parent/guardian for children) can:
-• Access a copy of your personal data,
-• Correct inaccurate data,
-• Delete data,
-• Restrict or object to certain processing,
-• Request portability (where applicable).
-Contact: hello@creditquest.co.uk. You may also complain to the ICO.
+    <h2>Your rights</h2>
+    <p>Access, correct, delete, restrict/object, or port your data. Email <strong>hello@creditquest.co.uk</strong>. You may also complain to the UK ICO.</p>
 
-Security
-• TLS encryption in transit,
-• Passwords stored with strong hashing,
-• Least-privilege, role-based access to infrastructure,
-• Ongoing patching and monitoring.
+    <h2>Security</h2>
+    <p>TLS in transit, hashed passwords, least-privilege access, ongoing patching/monitoring.</p>
 
-Changes to this policy
-We’ll post updates here and, for material changes, notify you in-app or by email.</p>
-    <button onclick="window.location.href='index.html'">Back</button>
+    <h2>Changes</h2>
+    <p>We’ll update this page and notify you for material changes.</p>
+
+    <p style="margin-top:10px;">
+      <a href="about.html">About</a> ·
+      <a href="terms.html">Terms</a> ·
+      <a href="cookies.html">Cookies</a>
+    </p>
   </div>
 </body>
 </html>
