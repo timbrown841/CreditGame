@@ -1,0 +1,13 @@
+// File: site.webmanifest (put at project root, next to your HTML files)
+{
+  "name": "Credit Quest",
+  "short_name": "Credit Quest",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#00c4cc",
+  "icons": [
+    { "src": "assets/icons/creditlogo192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/creditqlogo512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
