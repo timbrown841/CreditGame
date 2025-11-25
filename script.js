@@ -1,11 +1,16 @@
-/* SCRIPT.JS – FULL DROP-IN (merges with your current logic) */
-
+/* File: script.js (drop-in) */
 const apiBase = "https://credit-api-uhou.onrender.com";
+
 const COINS_PER_CORRECT = 1;
-const DAILY_BONUS = 3;           // coins for maintaining streak
-const STREAK_MAX_BONUS = 7;      // cap displayed streak, still counts internally
+const DAILY_REWARD = 5;
+const DAILY_COUNT = 3;           // daily questions per day
+const DAILY_XP_PER_CORRECT = 5;
+
+const DAILY_BONUS = 3;           // login streak bonus
+const STREAK_MAX_BONUS = 7;
 const XP_PER_CORRECT = 5;
-const XP_BASE_TO_LEVEL = 20;     // XP needed for level 1->2 (ramps up)
+const XP_BASE_TO_LEVEL = 20;
+
 const SHOP_ITEMS = [
   { id: "frame-gold", name: "Gold Frame", cost: 15, color: "gold" },
   { id: "frame-cyan", name: "Cyan Frame", cost: 10, color: "#00c4cc" },
@@ -13,103 +18,132 @@ const SHOP_ITEMS = [
   { id: "frame-lime", name: "Lime Frame", cost: 8,  color: "limegreen" }
 ];
 
+/* ======= STATE ======= */
 let container;
 let currentCoins = 0;
 let correctAnswers = 0;
-let currentLevelKey = "easy";
+
+let currentMode = "normal";          // "normal" | "daily"
+let currentLevelKey = "easy";        // for normal mode
+let currentBank = [];                // active questions array
+let currentIndex = 0;
 
 let unlockedLevels =
   JSON.parse(localStorage.getItem("unlockedLevels") || "null") ??
   { easy: true, medium: false, hard: false };
+
 let levelTrophies =
   JSON.parse(localStorage.getItem("levelTrophies") || "null") ??
   { easy: false, medium: false, hard: false };
 
-/* New persistent gamification state */
 let streak = Number(localStorage.getItem("streak") || 0);
-let lastPlay = localStorage.getItem("lastPlay") || ""; // YYYY-MM-DD
+let lastPlay = localStorage.getItem("lastPlay") || "";
 let xp = Number(localStorage.getItem("xp") || 0);
 let level = Number(localStorage.getItem("level") || 1);
-let chosenFrame = localStorage.getItem("avatarFrame") || ""; // from SHOP_ITEMS ids
+let chosenFrame = localStorage.getItem("avatarFrame") || "";
 
+/* ======= BOOT ======= */
 document.addEventListener("DOMContentLoaded", () => {
   const name = (localStorage.getItem("playerName") || "").trim();
   const avatar = localStorage.getItem("playerAvatar");
   if (!name || !avatar) {
-    window.location.href = "login.html";
-    return;
+    window.location.href = "login.html"; return;
   }
 
-  // Base coins
-  currentCoins = Number(localStorage.getItem("playerCoins") || 0);
-  if (!Number.isFinite(currentCoins)) currentCoins = 0;
+  currentCoins = Number(localStorage.getItem("playerCoins") || 0) || 0;
 
-  // UI: Name & avatar
   setText("displayName", `Welcome, ${name}!`);
   const avatarEl = document.getElementById("avatarDisplay");
-  if (avatarEl) {
-    avatarEl.src = `assets/avatars/${avatar}`;
-    // apply cosmetic frame if any
-    applyAvatarFrame(avatarEl, chosenFrame);
-  }
+  if (avatarEl) { avatarEl.src = `assets/avatars/${avatar}`; applyAvatarFrame(avatarEl, chosenFrame); }
 
-  // Show quiz container
   document.getElementById("loginContainer")?.remove();
-  const qc = document.getElementById("quizContainer");
-  if (qc) qc.style.display = "block";
+  const qc = document.getElementById("quizContainer"); if (qc) qc.style.display = "block";
   container = document.getElementById("quizContent") || document.body;
 
-  // First-run persistence
   if (!localStorage.getItem("unlockedLevels"))
     localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
   if (!localStorage.getItem("levelTrophies"))
     localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
 
-  // Daily streak check (+ optional daily bonus)
   handleDailyStreak();
-
-  // Init UI
   updateCoinsUI();
   updateXPUI();
   showIntroModule();
   wireShopModal();
 });
 
-/* ======= QUIZ BANK (keep your “better” questions) ======= */
+/* ======= NORMAL QUIZ BANK (unchanged) ======= */
 const quizLevels = {
   easy: [
     { question: "What does a credit score tell people?",
-      options: ["How fast you can run","How good you are with money","What school you go to"], correct: 1,
+      options: ["How fast you can run", "How good you are with money", "What school you go to"], correct: 1,
       learnId: "what-is-credit-score" },
     { question: "Which is a good money habit?",
-      options: ["Always paying bills on time","Spending all your money","Losing your wallet"], correct: 0,
+      options: ["Always paying bills on time", "Spending all your money", "Losing your wallet"], correct: 0,
       learnId: "good-money-habit" }
   ],
   medium: [
     { question: "What happens if you forget to pay your phone bill?",
-      options: ["Nothing changes","Your credit score might go down","You get a prize"], correct: 1,
+      options: ["Nothing changes", "Your credit score might go down", "You get a prize"], correct: 1,
       learnId: "missed-bills" },
     { question: "Who checks your credit score?",
-      options: ["Your friends","Banks and lenders","Your teacher"], correct: 1,
+      options: ["Your friends", "Banks and lenders", "Your teacher"], correct: 1,
       learnId: "who-checks-score" }
   ],
   hard: [
     { question: "How can you build a good credit score?",
-      options: ["Never pay it back","Pay bills on time","Buy games"], correct: 1,
+      options: ["Never pay it back", "Pay bills on time", "Buy games"], correct: 1,
       learnId: "build-good-score" },
     { question: "What number is a high credit score in the UK?",
-      options: ["100","999","5000"], correct: 1,
+      options: ["100", "999", "5000"], correct: 1,
       learnId: "high-score-number" },
     { question: "Which one is a bad money habit?",
-      options: ["Paying late","Saving monthly","Checking statements"], correct: 0,
+      options: ["Paying late", "Saving monthly", "Checking statements"], correct: 0,
       learnId: "bad-habits" }
   ]
 };
 
-/* ======= CORE FLOW ======= */
+/* ======= DAILY CHALLENGE BANK (NEW, distinct questions) ======= */
+const dailyQuestions = [
+  { question: "What is a ‘minimum payment’ on a credit card?",
+    options: ["The smallest amount you must pay each month", "A fee for opening the card", "A bonus you get for spending"],
+    correct: 0, learnId: "min-payment" },
+  { question: "If your card limit is £1000 and you owe £250, your utilisation is…",
+    options: ["25%", "50%", "75%"], correct: 0, learnId: "utilisation" },
+  { question: "A ‘hard check’ usually happens when…",
+    options: ["You check your own score", "A lender checks your report for a new credit application", "You pay your bill"],
+    correct: 1, learnId: "hard-check" },
+  { question: "Missing a payment can stay on your credit report for up to…",
+    options: ["1 month", "6 months", "6 years"], correct: 2, learnId: "missed-bills" },
+  { question: "A good first step to build credit is…",
+    options: ["Maxing your first card", "Registering on the electoral roll", "Opening many loans at once"], correct: 1, learnId: "build-good-score" },
+  { question: "Which is true about overdrafts?",
+    options: ["They’re not credit", "They can charge interest/fees", "They always improve your score"], correct: 1, learnId: "overdrafts" },
+  { question: "If you pay your balance in full each month, you usually pay…",
+    options: ["No interest", "Double interest", "A late fee only"], correct: 0, learnId: "interest" },
+  { question: "Why check your credit report yearly?",
+    options: ["To dispute errors", "To lower your grade", "To add more debt"], correct: 0, learnId: "check-report" }
+];
+
+/* Deterministic ‘today’ set: returns an array of DAILY_COUNT questions */
+function getTodayDailySet() {
+  const today = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  const seed = Number(today.replace(/-/g, ""));       // simple seed
+  const pool = [...dailyQuestions];
+  // Fisher-Yates with seeded pseudo-random
+  let r = seed;
+  function rand() { r = (r * 9301 + 49297) % 233280; return r / 233280; }
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, DAILY_COUNT);
+}
+
+/* ======= UI ======= */
 function showIntroModule() {
   const name = localStorage.getItem("playerName") || "Player";
-  const daily = getTodayDaily();
+  const daily = getTodayDailyMeta();
 
   container.innerHTML = `
     <h2>Hi ${name} 👋</h2>
@@ -122,8 +156,11 @@ function showIntroModule() {
     <div style="margin:.25rem 0 .5rem 0;">⭐ Level ${level}</div>
 
     <div class="quiz-summary" style="margin-top:.5rem;">
-      <strong>🎯 Daily Challenge:</strong> ${daily.label} — Reward: +${daily.reward} coins
-      <div style="margin-top:.5rem;"><button onclick="startDaily()">Start Daily</button> <button onclick="openShop()">🛍️ Shop</button></div>
+      <strong>🎯 Daily Challenge:</strong> ${daily.label} — Reward: +${DAILY_REWARD} coins
+      <div style="margin-top:.5rem;">
+        <button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
+        <button onclick="openShop()">🛍️ Shop</button>
+      </div>
     </div>
 
     <hr>
@@ -133,32 +170,44 @@ function showIntroModule() {
     <button onclick="logoutUser()">🚪 Logout</button>
   `;
 
-  // Show streak pill if active
   renderStreakPill();
-  // Ensure XP bar visible
-  const xpBar = document.getElementById("xpBar");
-  if (xpBar) xpBar.style.display = "block";
+  const xpBar = document.getElementById("xpBar"); if (xpBar) xpBar.style.display = "block";
 }
 
 function startQuiz(levelKey) {
-  correctAnswers = 0;
+  currentMode = "normal";
   currentLevelKey = levelKey;
-  showQuestion(0);
+  currentBank = quizLevels[levelKey];
+  correctAnswers = 0;
+  currentIndex = 0;
+  renderQuestion();
 }
 
-function showQuestion(index) {
-  const qList = quizLevels[currentLevelKey];
-  const q = qList[index];
+function startDaily() {
+  currentMode = "daily";
+  currentBank = getTodayDailySet(); // NEW: distinct daily bank
+  correctAnswers = 0;
+  currentIndex = 0;
+  localStorage.setItem("dailyActive", "1");
+  renderQuestion();
+}
 
+function renderQuestion() {
+  const q = currentBank[currentIndex];
   container.innerHTML = `
-    <div class="score-tracker">Score: ${"⭐".repeat(correctAnswers)}${"☆".repeat(qList.length - correctAnswers)}</div>
+    <div class="score-tracker">
+      ${currentMode === "daily"
+        ? `Daily: ${currentIndex + 1}/${currentBank.length}`
+        : `Score: ${"⭐".repeat(correctAnswers)}${"☆".repeat(currentBank.length - correctAnswers)}`
+      }
+    </div>
     <div class="quiz-layout">
       <div class="charlie">
         <img src="assets/charlie.png" alt="Charlie the Coin"/>
-        <div class="speech">Let's go! Answer this question 🪙</div>
+        <div class="speech">${currentMode === "daily" ? "Daily Challenge!" : "Let's go! 🪙"}</div>
       </div>
       <div class="quiz-question">
-        <h2>Quiz Time!</h2>
+        <h2>${currentMode === "daily" ? "Daily Question" : "Quiz Time!"}</h2>
         <p>${q.question}</p>
         ${q.options.map((opt, i) => `<button type="button" class="optionBtn" data-index="${i}">${opt}</button>`).join("")}
       </div>
@@ -173,59 +222,76 @@ function showQuestion(index) {
 
       if (isCorrect) {
         correctAnswers++;
-        earnCorrectRewards(); // coins + XP + animation
+        awardCoins(COINS_PER_CORRECT);
+        addXP(currentMode === "daily" ? DAILY_XP_PER_CORRECT : XP_PER_CORRECT);
+        floatCoin("+1");
         alert("✅ Correct!");
       } else {
         alert(`❌ Correct: ${q.options[q.correct]}\nClick OK to learn why.`);
         if (q.learnId) window.open(`learning.html#${q.learnId}`, "_blank");
       }
-      const next = index + 1;
-      next < qList.length ? showQuestion(next) : showQuizSummary();
+
+      currentIndex++;
+      currentIndex < currentBank.length ? renderQuestion() : showQuizSummary();
     });
   });
 }
 
 function showQuizSummary() {
-  const total = quizLevels[currentLevelKey].length;
+  const total = currentBank.length;
   const stars = "⭐".repeat(correctAnswers) + "☆".repeat(total - correctAnswers);
 
   let msg = "";
-  if (correctAnswers === total) {
-    msg = "🎉 Perfect!";
-    unlockNextLevel(currentLevelKey);
-    playWin();
-  } else if (correctAnswers >= Math.floor(total * 0.7)) {
-    msg = "👏 Great job!";
+  if (currentMode === "daily") {
+    msg = correctAnswers === total ? "🎉 Daily complete!" : "Daily finished!";
+    completeDailyIfEligible();
   } else {
-    msg = "🧐 Keep practicing!";
+    if (correctAnswers === total) { msg = "🎉 Perfect!"; unlockNextLevel(currentLevelKey); playWin(); }
+    else if (correctAnswers >= Math.floor(total * 0.7)) msg = "👏 Great job!";
+    else msg = "🧐 Keep practicing!";
   }
 
   container.innerHTML = `
     <div class="quiz-summary">
-      <h2>Quiz Complete!</h2>
-      <p class="animated-stars">Your Score: ${stars}</p>
+      <h2>${currentMode === "daily" ? "Daily Summary" : "Quiz Complete!"}</h2>
+      ${currentMode === "daily" ? "" : `<p class="animated-stars">Your Score: ${stars}</p>`}
       <p>${msg}</p>
-      <button onclick="startQuiz('${currentLevelKey}')">🔁 Try Again</button>
+      <button onclick="${currentMode === "daily" ? "startDaily()" : `startQuiz('${currentLevelKey}')`}">🔁 Try Again</button>
       <button onclick="showIntroModule()">🔙 Back to Menu</button>
     </div>
   `;
 }
 
-/* ======= REWARDS / XP / STREAKS ======= */
-function earnCorrectRewards() {
-  // Coins
-  awardCoins(COINS_PER_CORRECT);
-  floatCoin("+1");
-
-  // XP
-  addXP(XP_PER_CORRECT);
+/* ======= DAILY META / COMPLETION ======= */
+function getTodayDailyMeta() {
+  const todayKey = new Date().toISOString().slice(0,10);
+  const key = `daily-${todayKey}`;
+  const done = localStorage.getItem(key) === "done";
+  // Simple rotating label; could reflect theme of first question
+  return { key, done, label: "Answer today's 3 new questions" };
 }
 
+function completeDailyIfEligible() {
+  const { key, done } = getTodayDailyMeta();
+  const active = localStorage.getItem("dailyActive") === "1";
+  if (done) return;
+  if (!active) return;
+  localStorage.removeItem("dailyActive");
+
+  if (correctAnswers >= Math.ceil(currentBank.length * 0.67)) {
+    awardCoins(DAILY_REWARD);
+    localStorage.setItem(key, "done");
+    alert(`🎯 Daily complete! +${DAILY_REWARD} coins`);
+  } else {
+    alert("Daily not complete. Try again!");
+  }
+}
+
+/* ======= COINS / XP / STREAKS ======= */
 function awardCoins(amount) {
   currentCoins += amount;
   localStorage.setItem("playerCoins", String(currentCoins));
   updateCoinsUI();
-  // POST (non-blocking)
   fetch(`${apiBase}/reward-coins`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username: localStorage.getItem("playerName"), amount })
@@ -240,22 +306,18 @@ function updateCoinsUI() {
 
 function addXP(amount) {
   xp += amount;
-  const need = xpToNext(level);
+  let need = xpToNext(level);
   while (xp >= need) {
-    xp -= need;
-    level++;
-    triggerConfetti();
-    awardCoins(3); // level-up bonus
+    xp -= need; level++;
+    triggerConfetti(); awardCoins(3);
+    need = xpToNext(level);
   }
   localStorage.setItem("xp", String(xp));
   localStorage.setItem("level", String(level));
   updateXPUI();
 }
 
-function xpToNext(lv) {
-  // Simple ramp: base + 5 per level
-  return XP_BASE_TO_LEVEL + (lv - 1) * 5;
-}
+function xpToNext(lv) { return XP_BASE_TO_LEVEL + (lv - 1) * 5; }
 
 function updateXPUI() {
   const need = xpToNext(level);
@@ -264,108 +326,42 @@ function updateXPUI() {
   const text = document.getElementById("xpText");
   if (fill) fill.style.width = pct + "%";
   if (text) text.textContent = `Lv ${level} · ${xp}/${need} XP`;
-  const bar = document.getElementById("xpBar");
-  if (bar) bar.style.display = "block";
+  const bar = document.getElementById("xpBar"); if (bar) bar.style.display = "block";
 }
 
-/* ======= DAILY STREAK ======= */
 function handleDailyStreak() {
-  const today = new Date();
-  const todayKey = today.toISOString().slice(0,10); // YYYY-MM-DD
-
-  if (!lastPlay) {
-    streak = 1;
-    lastPlay = todayKey;
-  } else {
-    const prev = new Date(lastPlay + "T00:00:00Z");
-    const diffDays = Math.floor((today - prev) / (1000*60*60*24));
-    if (diffDays === 0) {
-      // already counted today
-    } else if (diffDays === 1) {
-      streak++;
-      // daily login bonus (optional)
-      awardCoins(DAILY_BONUS);
-    } else {
-      streak = 1; // broken streak
-    }
+  const todayKey = new Date().toISOString().slice(0,10);
+  if (!lastPlay) { streak = 1; lastPlay = todayKey; }
+  else {
+    const diff = daysBetween(lastPlay, todayKey);
+    if (diff === 1) { streak++; awardCoins(DAILY_BONUS); }
+    else if (diff > 1) { streak = 1; }
     lastPlay = todayKey;
   }
-
   localStorage.setItem("streak", String(streak));
   localStorage.setItem("lastPlay", lastPlay);
 }
 
 function renderStreakPill() {
-  const pill = document.getElementById("streakPill");
-  if (!pill) return;
+  const pill = document.getElementById("streakPill"); if (!pill) return;
   const shown = Math.min(streak, STREAK_MAX_BONUS);
   if (streak > 0) {
-    pill.classList.add("streak");
-    pill.style.display = "inline-block";
+    pill.classList.add("streak"); pill.style.display = "inline-block";
     pill.textContent = `🔥 Streak: ${shown} day${shown === 1 ? "" : "s"}`;
-  } else {
-    pill.style.display = "none";
-  }
+  } else pill.style.display = "none";
 }
 
-/* ======= DAILY CHALLENGE ======= */
-function getTodayDaily() {
-  // Simple rotating label; you can expand to real tasks
-  const labels = [
-    "Score 2 correct answers",
-    "Finish any quiz",
-    "Get a perfect score on Easy",
-    "Answer 3 questions"
-  ];
-  const today = new Date().toISOString().slice(0,10);
-  const idx = (today.split("-").join("").split("").reduce((a,b)=>a+Number(b),0)) % labels.length;
-  return { key: "daily-"+today, label: labels[idx], reward: 5 };
+function daysBetween(a, b) {
+  const d1 = new Date(a + "T00:00:00Z");
+  const d2 = new Date(b + "T00:00:00Z");
+  return Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
 }
 
-function startDaily() {
-  // For demo: jump into Easy quiz
-  startQuiz("easy");
-  localStorage.setItem("dailyActive", "1");
-}
-
-function checkDailyProgress() {
-  const active = localStorage.getItem("dailyActive") === "1";
-  if (!active) return;
-  const daily = getTodayDaily();
-  // Example completion rule: at least 2 correct in any run
-  if (correctAnswers >= 2) {
-    localStorage.removeItem("dailyActive");
-    if (localStorage.getItem(daily.key) !== "done") {
-      awardCoins(daily.reward);
-      localStorage.setItem(daily.key, "done");
-      alert(`🎯 Daily complete! +${daily.reward} coins`);
-    }
-  }
-}
-
-/* Call after quiz end */
-const _origShowQuizSummary = showQuizSummary;
-showQuizSummary = function () {
-  _origShowQuizSummary.apply(this, arguments);
-  checkDailyProgress();
-}
-
-/* ======= SHOP (COSMETICS) ======= */
-function openShop() {
-  const modal = document.getElementById("shopModal");
-  if (!modal) return;
-  modal.style.display = "flex";
-  renderShopItems();
-}
-function wireShopModal() {
-  document.getElementById("closeShopBtn")?.addEventListener("click", () => {
-    const modal = document.getElementById("shopModal");
-    if (modal) modal.style.display = "none";
-  });
-}
+/* ======= SHOP / COSMETICS ======= */
+function openShop() { const m = document.getElementById("shopModal"); if (m) { m.style.display = "flex"; renderShopItems(); } }
+function wireShopModal() { document.getElementById("closeShopBtn")?.addEventListener("click", () => { const m = document.getElementById("shopModal"); if (m) m.style.display = "none"; }); }
 function renderShopItems() {
-  const grid = document.getElementById("shopItems");
-  if (!grid) return;
+  const grid = document.getElementById("shopItems"); if (!grid) return;
   grid.innerHTML = SHOP_ITEMS.map(it => {
     const owned = localStorage.getItem("own_"+it.id) === "1";
     const using = chosenFrame === it.id;
@@ -384,31 +380,42 @@ function renderShopItems() {
   }).join("");
 }
 function buyFrame(id) {
-  const it = SHOP_ITEMS.find(x=>x.id===id);
-  if (!it) return;
+  const it = SHOP_ITEMS.find(x=>x.id===id); if (!it) return;
   if (currentCoins < it.cost) { alert("Not enough coins"); return; }
-  awardCoins(-it.cost); // spend
-  localStorage.setItem("own_"+id, "1");
-  renderShopItems();
+  awardCoins(-it.cost); localStorage.setItem("own_"+id, "1"); renderShopItems();
 }
 function equipFrame(id) {
-  chosenFrame = id;
-  localStorage.setItem("avatarFrame", id);
-  const avatarEl = document.getElementById("avatarDisplay");
-  if (avatarEl) applyAvatarFrame(avatarEl, id);
+  chosenFrame = id; localStorage.setItem("avatarFrame", id);
+  const avatarEl = document.getElementById("avatarDisplay"); if (avatarEl) applyAvatarFrame(avatarEl, id);
   renderShopItems();
 }
 function applyAvatarFrame(imgEl, id) {
   const item = SHOP_ITEMS.find(x=>x.id===id);
   if (!item) { imgEl.style.boxShadow = ""; imgEl.style.borderColor=""; imgEl.style.borderWidth="2px"; return; }
-  // why: this is purely visual; keep it tasteful
-  imgEl.style.borderColor = item.color;
-  imgEl.style.borderWidth = "4px";
+  imgEl.style.borderColor = item.color; imgEl.style.borderWidth = "4px";
 }
 
-/* ======= UTIL / EFFECTS ======= */
-function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
+/* ======= AUDIO / EFFECTS ======= */
+const soundCorrect = new Audio("assets/sounds/correct.mp3");
+const soundWrong = new Audio("assets/sounds/wrong.mp3");
+const soundWin = new Audio("assets/sounds/win.mp3");
+const bgMusic = new Audio("assets/sounds/background.mp3");
+bgMusic.loop = true; bgMusic.volume = 0.4;
 
+let musicOn = true;
+function toggleMusic() { musicOn = !musicOn; musicOn ? bgMusic.play() : bgMusic.pause(); alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`); }
+function playWin(){ triggerConfetti(); }
+function floatCoin(text) {
+  const anchor = document.getElementById("coinDisplay");
+  const div = document.createElement("div");
+  div.className = "coin-float"; div.textContent = text;
+  document.body.appendChild(div);
+  const rect = anchor ? anchor.getBoundingClientRect() : { left: window.innerWidth/2, top: 20 };
+  div.style.left = rect.left + "px"; div.style.top = (rect.top - 8) + "px";
+  div.style.color = "#ffcd3c"; div.style.transform = "translateY(0)"; div.style.opacity = "1";
+  requestAnimationFrame(() => { div.style.transform = "translateY(-30px)"; div.style.opacity = "0"; });
+  setTimeout(() => div.remove(), 800);
+}
 function triggerConfetti() {
   for (let i = 0; i < 20; i++) {
     const s = document.createElement("div");
@@ -425,40 +432,21 @@ function triggerConfetti() {
   }
 }
 
-function playWin(){ triggerConfetti(); }
+/* ======= UTILS ======= */
+function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
 
-/* Floating +coin near the coin pill */
-function floatCoin(text) {
-  const anchor = document.getElementById("coinDisplay");
-  const div = document.createElement("div");
-  div.className = "coin-float";
-  div.textContent = text;
-  document.body.appendChild(div);
-
-  const rect = anchor ? anchor.getBoundingClientRect() : { left: window.innerWidth/2, top: 20 };
-  div.style.left = rect.left + "px";
-  div.style.top = (rect.top - 8) + "px";
-  div.style.color = "#ffcd3c";
-  div.style.transform = "translateY(0)";
-  div.style.opacity = "1";
-
-  requestAnimationFrame(() => {
-    div.style.transform = "translateY(-30px)";
-    div.style.opacity = "0";
-  });
-  setTimeout(() => div.remove(), 800);
-}
-
-/* ======= LEVEL UNLOCKS (your original logic) ======= */
-function unlockNextLevel(levelKey) {
-  if (!levelTrophies[levelKey]) {
-    levelTrophies[levelKey] = true;
-    localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
-    // optional: show trophy modal if present
-    const modal = document.getElementById("trophyModal");
-    if (modal) { modal.style.display = "block"; setTimeout(()=>modal.style.display="none", 3000); }
-  }
-  if (levelKey === "easy") unlockedLevels.medium = true;
-  if (levelKey === "medium") unlockedLevels.hard = true;
-  localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
+function logoutUser() {
+  localStorage.removeItem("playerName");
+  localStorage.removeItem("playerAvatar");
+  localStorage.removeItem("playerCoins");
+  localStorage.removeItem("unlockedLevels");
+  localStorage.removeItem("levelTrophies");
+  localStorage.removeItem("streak");
+  localStorage.removeItem("lastPlay");
+  localStorage.removeItem("xp");
+  localStorage.removeItem("level");
+  localStorage.removeItem("avatarFrame");
+  localStorage.removeItem("dailyActive");
+  // keep daily completion keys by date so user can’t replay reward the same day
+  window.location.href = "login.html";
 }
