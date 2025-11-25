@@ -12,12 +12,19 @@
   
   <!-- Avatar header -->
 <div class="avatar-container">
+  <span id="streakPill" class="pill" style="display:none;"></span>
   <img id="avatarDisplay" class="avatar-image" alt="Your Avatar" />
   <h3 id="displayName"></h3>
   <!-- add this line here -->
   <span id="coinDisplay" class="pill">Coins: 0</span>
 </div>
   
+<!-- 2) Progress bar (place just above quiz container or inside it) -->
+  <div id="xpBar" class="xp-bar" aria-label="Level progress" style="display:none;">
+  <span id="xpText">Lv 1 · 0/20 XP</span>
+  <div class="xp-rail"><div id="xpFill" class="xp-fill"></div></div>
+</div>
+
   <!-- Go straight to quiz; name prompt removed -->
   <div class="container" id="quizContainer">
     <div id="quizContent"></div>
@@ -37,6 +44,16 @@
   <div class="twinkle star1"></div>
   <div class="twinkle star2"></div>
   <div class="twinkle star3"></div>
+
+  <!-- 3) Simple Shop modal (append near end of body, before script.js) -->
+  <div id="shopModal" class="shop-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+  <div class="shop-card container">
+    <h2 id="shopTitle">🛍️ Coin Shop (cosmetics)</h2>
+    <p>Spend coins on avatar frames (cosmetic only).</p>
+    <div id="shopItems" class="shop-grid"></div>
+    <button type="button" id="closeShopBtn">Close</button>
+  </div>
+</div>
 
   <script src="script.js"></script>
   <script>
