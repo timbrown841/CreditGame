@@ -278,6 +278,30 @@ function showQuizSummary() {
   `;
 }
 
+/* ======= UNLOCK / TROPHIES ======= */
+function unlockNextLevel(levelKey) {
+  let changed = false;
+
+  if (!levelTrophies[levelKey]) {
+    levelTrophies[levelKey] = true;
+    localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
+    changed = true;
+  }
+
+  if (levelKey === "easy" && !unlockedLevels.medium) {
+    unlockedLevels.medium = true;
+    changed = true;
+  } else if (levelKey === "medium" && !unlockedLevels.hard) {
+    unlockedLevels.hard = true;
+    changed = true;
+  }
+
+  if (changed) {
+    localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
+    alert("🏆 Level complete! Next level unlocked.");
+  }
+}
+
 /* ======= DAILY META / COMPLETION (local) ======= */
 function getTodayDailyMeta() {
   const todayKey = new Date().toISOString().slice(0,10);
