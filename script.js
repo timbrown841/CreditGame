@@ -1,12 +1,13 @@
-/* File: script.js (drop-in) */
+/* File: script.js — full, fixed */
+
 const apiBase = "https://credit-api-uhou.onrender.com";
 
 const COINS_PER_CORRECT = 1;
 const DAILY_REWARD = 5;
-const DAILY_COUNT = 3;           // daily questions per day
+const DAILY_COUNT = 3;
 const DAILY_XP_PER_CORRECT = 5;
 
-const DAILY_BONUS = 3;           // login streak bonus
+const DAILY_BONUS = 3;
 const STREAK_MAX_BONUS = 7;
 const XP_PER_CORRECT = 5;
 const XP_BASE_TO_LEVEL = 20;
@@ -23,9 +24,9 @@ let container;
 let currentCoins = 0;
 let correctAnswers = 0;
 
-let currentMode = "normal";          // "normal" | "daily"
-let currentLevelKey = "easy";        // for normal mode
-let currentBank = [];                // active questions array
+let currentMode = "normal";           // "normal" | "daily"
+let currentLevelKey = "easy";
+let currentBank = [];                 // active questions
 let currentIndex = 0;
 
 let unlockedLevels =
@@ -72,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireShopModal();
 });
 
-/* ======= NORMAL QUIZ BANK (unchanged) ======= */
+/* ======= QUIZ BANKS ======= */
 const quizLevels = {
   easy: [
     { question: "What does a credit score tell people?",
@@ -87,52 +88,46 @@ const quizLevels = {
       options: ["Nothing changes", "Your credit score might go down", "You get a prize"], correct: 1,
       learnId: "missed-bills" },
     { question: "Who checks your credit score?",
-      options: ["Your friends", "Banks and lenders", "Your teacher"], correct: 1,
+      options: ["Your friends","Banks and lenders","Your teacher"], correct: 1,
       learnId: "who-checks-score" }
   ],
   hard: [
     { question: "How can you build a good credit score?",
-      options: ["Never pay it back", "Pay bills on time", "Buy games"], correct: 1,
+      options: ["Never pay it back","Pay bills on time","Buy games"], correct: 1,
       learnId: "build-good-score" },
     { question: "What number is a high credit score in the UK?",
-      options: ["100", "999", "5000"], correct: 1,
+      options: ["100","999","5000"], correct: 1,
       learnId: "high-score-number" },
     { question: "Which one is a bad money habit?",
-      options: ["Paying late", "Saving monthly", "Checking statements"], correct: 0,
+      options: ["Paying late","Saving monthly","Checking statements"], correct: 0,
       learnId: "bad-habits" }
   ]
 };
 
-/* ======= DAILY CHALLENGE BANK (NEW, distinct questions) ======= */
 const dailyQuestions = [
   { question: "What is a ‘minimum payment’ on a credit card?",
-    options: ["The smallest amount you must pay each month", "A fee for opening the card", "A bonus you get for spending"],
-    correct: 0, learnId: "min-payment" },
+    options: ["The smallest amount you must pay each month","A fee for opening the card","A bonus you get for spending"], correct: 0, learnId: "min-payment" },
   { question: "If your card limit is £1000 and you owe £250, your utilisation is…",
-    options: ["25%", "50%", "75%"], correct: 0, learnId: "utilisation" },
+    options: ["25%","50%","75%"], correct: 0, learnId: "utilisation" },
   { question: "A ‘hard check’ usually happens when…",
-    options: ["You check your own score", "A lender checks your report for a new credit application", "You pay your bill"],
-    correct: 1, learnId: "hard-check" },
+    options: ["You check your own score","A lender checks your report for a new credit application","You pay your bill"], correct: 1, learnId: "hard-check" },
   { question: "Missing a payment can stay on your credit report for up to…",
-    options: ["1 month", "6 months", "6 years"], correct: 2, learnId: "missed-bills" },
+    options: ["1 month","6 months","6 years"], correct: 2, learnId: "missed-bills" },
   { question: "A good first step to build credit is…",
-    options: ["Maxing your first card", "Registering on the electoral roll", "Opening many loans at once"], correct: 1, learnId: "build-good-score" },
+    options: ["Maxing your first card","Registering on the electoral roll","Opening many loans at once"], correct: 1, learnId: "build-good-score" },
   { question: "Which is true about overdrafts?",
-    options: ["They’re not credit", "They can charge interest/fees", "They always improve your score"], correct: 1, learnId: "overdrafts" },
+    options: ["They’re not credit","They can charge interest/fees","They always improve your score"], correct: 1, learnId: "overdrafts" },
   { question: "If you pay your balance in full each month, you usually pay…",
-    options: ["No interest", "Double interest", "A late fee only"], correct: 0, learnId: "interest" },
+    options: ["No interest","Double interest","A late fee only"], correct: 0, learnId: "interest" },
   { question: "Why check your credit report yearly?",
-    options: ["To dispute errors", "To lower your grade", "To add more debt"], correct: 0, learnId: "check-report" }
+    options: ["To dispute errors","To lower your grade","To add more debt"], correct: 0, learnId: "check-report" }
 ];
 
-/* Deterministic ‘today’ set: returns an array of DAILY_COUNT questions */
 function getTodayDailySet() {
-  const today = new Date().toISOString().slice(0,10); // YYYY-MM-DD
-  const seed = Number(today.replace(/-/g, ""));       // simple seed
+  const today = new Date().toISOString().slice(0,10);
+  const seed = Number(today.replace(/-/g, ""));
   const pool = [...dailyQuestions];
-  // Fisher-Yates with seeded pseudo-random
-  let r = seed;
-  function rand() { r = (r * 9301 + 49297) % 233280; return r / 233280; }
+  let r = seed; function rand() { r = (r * 9301 + 49297) % 233280; return r / 233280; }
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -141,7 +136,7 @@ function getTodayDailySet() {
 }
 
 /* ======= UI ======= */
-function showIntroModule() {
+async function showIntroModule() {
   const name = localStorage.getItem("playerName") || "Player";
   const daily = getTodayDailyMeta();
 
@@ -174,26 +169,31 @@ function showIntroModule() {
   const xpBar = document.getElementById("xpBar"); if (xpBar) xpBar.style.display = "block";
 }
 
+/* START normal quiz */
 function startQuiz(levelKey) {
   currentMode = "normal";
   currentLevelKey = levelKey;
-  currentBank = quizLevels[levelKey];
+  currentBank = quizLevels[levelKey] || [];
   correctAnswers = 0;
   currentIndex = 0;
   renderQuestion();
 }
 
+/* START daily challenge */
 function startDaily() {
   currentMode = "daily";
-  currentBank = getTodayDailySet(); // NEW: distinct daily bank
+  currentBank = getTodayDailySet();
   correctAnswers = 0;
   currentIndex = 0;
   localStorage.setItem("dailyActive", "1");
   renderQuestion();
 }
 
+/* RENDER current question (fixed handler) */
 function renderQuestion() {
   const q = currentBank[currentIndex];
+  if (!q) { showQuizSummary(); return; }
+
   container.innerHTML = `
     <div class="score-tracker">
       ${currentMode === "daily"
@@ -214,17 +214,18 @@ function renderQuestion() {
     </div>
   `;
 
-  document.querySelectorAll(".optionBtn").forEach(btn => {
+  document.querySelectorAll(".optionBtn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       document.querySelectorAll(".optionBtn").forEach(b => b.disabled = true);
-      const selected = parseInt(e.target.dataset.index, 10);
-      const isCorrect = selected === q.correct;
+
+      const idx = parseInt(e.currentTarget.dataset.index, 10); // crucial fix
+      const isCorrect = Number.isInteger(idx) && idx === q.correct;
 
       if (isCorrect) {
         correctAnswers++;
-        awardCoins(COINS_PER_CORRECT);
-        addXP(currentMode === "daily" ? DAILY_XP_PER_CORRECT : XP_PER_CORRECT);
-        floatCoin("+1");
+        try { awardCoins(COINS_PER_CORRECT); } catch {}
+        try { addXP(currentMode === "daily" ? DAILY_XP_PER_CORRECT : XP_PER_CORRECT); } catch {}
+        try { floatCoin("+1"); } catch {}
         alert("✅ Correct!");
       } else {
         alert(`❌ Correct: ${q.options[q.correct]}\nClick OK to learn why.`);
@@ -232,11 +233,16 @@ function renderQuestion() {
       }
 
       currentIndex++;
-      currentIndex < currentBank.length ? renderQuestion() : showQuizSummary();
-    });
+      if (currentIndex < currentBank.length) {
+        renderQuestion();            // advance reliably
+      } else {
+        showQuizSummary();
+      }
+    }, { once: true });               // bind once per render
   });
 }
 
+/* SUMMARY */
 function showQuizSummary() {
   const total = currentBank.length;
   const stars = "⭐".repeat(correctAnswers) + "☆".repeat(total - correctAnswers);
@@ -245,37 +251,45 @@ function showQuizSummary() {
   if (currentMode === "daily") {
     msg = correctAnswers === total ? "🎉 Daily complete!" : "Daily finished!";
     completeDailyIfEligible();
-  } else {
-    if (correctAnswers === total) { msg = "🎉 Perfect!"; unlockNextLevel(currentLevelKey); playWin(); }
-    else if (correctAnswers >= Math.floor(total * 0.7)) msg = "👏 Great job!";
-    else msg = "🧐 Keep practicing!";
+    container.innerHTML = `
+      <div class="quiz-summary">
+        <h2>Daily Summary</h2>
+        <p>${correctAnswers}/${total} correct</p>
+        <p>${msg}</p>
+        <button onclick="startDaily()">🔁 Try Again</button>
+        <button onclick="showIntroModule()">🔙 Back to Menu</button>
+      </div>
+    `;
+    return;
   }
+
+  if (correctAnswers === total) { msg = "🎉 Perfect!"; unlockNextLevel(currentLevelKey); playWin(); }
+  else if (correctAnswers >= Math.floor(total * 0.7)) { msg = "👏 Great job!"; }
+  else { msg = "🧐 Keep practicing!"; }
 
   container.innerHTML = `
     <div class="quiz-summary">
-      <h2>${currentMode === "daily" ? "Daily Summary" : "Quiz Complete!"}</h2>
-      ${currentMode === "daily" ? "" : `<p class="animated-stars">Your Score: ${stars}</p>`}
+      <h2>Quiz Complete!</h2>
+      <p class="animated-stars">Your Score: ${stars}</p>
       <p>${msg}</p>
-      <button onclick="${currentMode === "daily" ? "startDaily()" : `startQuiz('${currentLevelKey}')`}">🔁 Try Again</button>
+      <button onclick="startQuiz('${currentLevelKey}')">🔁 Try Again</button>
       <button onclick="showIntroModule()">🔙 Back to Menu</button>
     </div>
   `;
 }
 
-/* ======= DAILY META / COMPLETION ======= */
+/* ======= DAILY META / COMPLETION (local) ======= */
 function getTodayDailyMeta() {
   const todayKey = new Date().toISOString().slice(0,10);
   const key = `daily-${todayKey}`;
   const done = localStorage.getItem(key) === "done";
-  // Simple rotating label; could reflect theme of first question
   return { key, done, label: "Answer today's 3 new questions" };
 }
 
 function completeDailyIfEligible() {
   const { key, done } = getTodayDailyMeta();
   const active = localStorage.getItem("dailyActive") === "1";
-  if (done) return;
-  if (!active) return;
+  if (done || !active) return;
   localStorage.removeItem("dailyActive");
 
   if (correctAnswers >= Math.ceil(currentBank.length * 0.67)) {
@@ -447,6 +461,5 @@ function logoutUser() {
   localStorage.removeItem("level");
   localStorage.removeItem("avatarFrame");
   localStorage.removeItem("dailyActive");
-  // keep daily completion keys by date so user can’t replay reward the same day
   window.location.href = "login.html";
 }
