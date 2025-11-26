@@ -1,11 +1,13 @@
 // File: server.js
-// Node 18+ / "type":"module" expected
+// Node 18+ with "type":"module" in package.json
 
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
@@ -14,17 +16,32 @@ const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI;
 const MONGO_DB = process.env.MONGO_DB || undefined;
 
-// CORS: allow specific origins if provided
+// ---------- Middleware ----------
+app.set("trust proxy", 1); // behind Render/proxies
+
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(express.json({ limit: "1mb" }));
+
+// CORS allowlist via env: CORS_ALLOW_ORIGINS="https://creditquest.co.uk,https://www.creditquest.co.uk"
 const allow = (process.env.CORS_ALLOW_ORIGINS || "")
   .split(",")
-  .map(s => s.trim())
+  .map((s) => s.trim())
   .filter(Boolean);
 app.use(cors({ origin: allow.length ? allow : true, credentials: false }));
 
-app.use(express.json({ limit: "1mb" }));
+// Basic rate limits
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50 });
+const coinsLimiter = rateLimit({ windowMs: 60 * 1000, max: 120 });
+const dailyLimiter = rateLimit({ windowMs: 60 * 1000, max: 30 });
 
-// why: lower risk of typos/casing issues
+app.use("/login", authLimiter);
+app.use("/register", authLimiter);
+app.use("/reward-coins", coinsLimiter);
+app.use("/daily", dailyLimiter);
+
+// Helpers
 const normName = (s) => String(s || "").toLowerCase().trim();
+const isYMD = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 
 // ---------- Mongo ----------
 if (!MONGO_URI) {
@@ -32,7 +49,7 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-mongoose
+await mongoose
   .connect(MONGO_URI, { dbName: MONGO_DB })
   .then(() => console.log("✅ Mongo connected"))
   .catch((err) => {
@@ -49,7 +66,7 @@ const UserSchema = new mongoose.Schema(
     avatar: { type: String, default: "" },
     coins: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
-    lastLogin: { type: Date }
+    lastLogin: { type: Date },
   },
   { versionKey: false }
 );
@@ -65,7 +82,7 @@ const DailyCompletionSchema = new mongoose.Schema(
     correct: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     reward: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );
@@ -73,10 +90,16 @@ DailyCompletionSchema.index({ username: 1, date: 1 }, { unique: true });
 
 const DailyCompletion = mongoose.model("DailyCompletion", DailyCompletionSchema);
 
+// Ensure indexes are in sync
+await Promise.all([User.syncIndexes(), DailyCompletion.syncIndexes()])
+  .then(() => console.log("✅ Indexes in sync"))
+  .catch((e) => console.error("Index sync error:", e));
+
 // ---------- Routes ----------
 
-// Health
+// Health / readiness probes
 app.get("/", (_req, res) => res.send("🟢 Credit Quest API is running"));
+app.get("/healthz", (_req, res) => res.status(200).json({ ok: true }));
 
 // Register
 app.post("/register", async (req, res) => {
@@ -89,7 +112,13 @@ app.post("/register", async (req, res) => {
     if (exists) return res.status(409).send("Username already exists");
 
     const hash = await bcrypt.hash(String(password), 12);
-    await User.create({ username: uname, email: String(email).toLowerCase().trim(), password: hash, avatar, coins: 0 });
+    await User.create({
+      username: uname,
+      email: String(email).toLowerCase().trim(),
+      password: hash,
+      avatar,
+      coins: 0,
+    });
     res.status(201).send("Registered");
   } catch (err) {
     console.error("Register error:", err);
@@ -113,7 +142,6 @@ app.post("/login", async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // return minimal profile
     res.json({ username: user.username, avatar: user.avatar, coins: user.coins ?? 0 });
   } catch (err) {
     console.error("Login error:", err);
@@ -135,7 +163,7 @@ app.get("/user-data", async (req, res) => {
   }
 });
 
-// Reward coins (+/- allowed; client may spend for cosmetics)
+// Reward coins (+/- allowed; e.g., cosmetics spend)
 app.post("/reward-coins", async (req, res) => {
   try {
     const { username, amount } = req.body || {};
@@ -143,11 +171,7 @@ app.post("/reward-coins", async (req, res) => {
     const inc = Number(amount);
     if (!uname || !Number.isFinite(inc)) return res.status(400).send("username and numeric amount required");
 
-    const user = await User.findOneAndUpdate(
-      { username: uname },
-      { $inc: { coins: inc } },
-      { new: true }
-    );
+    const user = await User.findOneAndUpdate({ username: uname }, { $inc: { coins: inc } }, { new: true });
     if (!user) return res.status(404).send("User not found");
 
     res.json({ coins: user.coins ?? 0 });
@@ -159,16 +183,14 @@ app.post("/reward-coins", async (req, res) => {
 
 // ---- Daily Challenge ----
 
-// Validate YYYY-MM-DD
-const isYMD = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
-
 // Daily status
 app.get("/daily/status", async (req, res) => {
   try {
     const username = normName(req.query.username);
     const date = String(req.query.date || "").trim();
-    if (!username || !date || !isYMD(date)) return res.status(400).json({ error: "username and date (YYYY-MM-DD) are required" });
-
+    if (!username || !date || !isYMD(date)) {
+      return res.status(400).json({ error: "username and date (YYYY-MM-DD) are required" });
+    }
     const exists = await DailyCompletion.exists({ username, date });
     res.json({ done: !!exists });
   } catch (err) {
@@ -177,7 +199,7 @@ app.get("/daily/status", async (req, res) => {
   }
 });
 
-// Daily complete (award once per day, per user)
+// Daily complete (award once per user/day)
 app.post("/daily/complete", async (req, res) => {
   const { username, date, correct, total, reward } = req.body || {};
   const uname = normName(username);
@@ -186,13 +208,13 @@ app.post("/daily/complete", async (req, res) => {
   const tot = Number(total || 0);
   const rew = Math.max(0, Number(reward || 0));
 
-  if (!uname || !ymd || !isYMD(ymd)) return res.status(400).json({ error: "username and valid date are required" });
+  if (!uname || !ymd || !isYMD(ymd)) {
+    return res.status(400).json({ error: "username and valid date are required" });
+  }
 
-  // Attempt transaction first (Atlas/ReplicaSet). Fallback if not supported.
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      // Upsert completion; detect if it already existed
       const result = await DailyCompletion.findOneAndUpdate(
         { username: uname, date: ymd },
         { $setOnInsert: { username: uname, date: ymd, correct: corr, total: tot, reward: rew } },
@@ -205,16 +227,16 @@ app.post("/daily/complete", async (req, res) => {
         return res.json({ done: true, awarded: false, coins: user?.coins ?? 0 });
       }
 
-      // New completion → award coins atomically
       const user = await User.findOneAndUpdate(
         { username: uname },
         { $inc: { coins: rew } },
         { new: true, session }
       );
+
       return res.json({ done: true, awarded: true, coins: user?.coins ?? 0 });
     });
   } catch (err) {
-    // Fallback path for deployments without transactions
+    // Fallback path where transactions are unavailable
     if (String(err?.message || "").includes("Transaction numbers are only allowed")) {
       try {
         const result = await DailyCompletion.findOneAndUpdate(
@@ -243,7 +265,6 @@ app.post("/daily/complete", async (req, res) => {
       }
     }
 
-    // Duplicate key race → already completed today
     if (err && err.code === 11000) {
       try {
         const user = await User.findOne({ username: uname }).lean();
