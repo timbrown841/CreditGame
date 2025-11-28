@@ -320,3 +320,37 @@ button:hover {
 .shop-item .frame-preview { width:70px; height:70px; margin:0 auto .5rem; border-radius:50%; border:4px solid transparent; }
 .shop-item button { width: auto; margin-top:.25rem; padding:.5rem .75rem; }
 
+/* === Coin Rain === */
+#coinRainOverlay{
+  position:fixed; inset:0; z-index:2000; display:none;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+  align-items:stretch; justify-content:center; flex-direction:column;
+}
+#coinRainOverlay .cr-hud{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:12px; align-items:center;
+  background: rgba(0,0,0,0.65); padding:8px 12px; border-radius:12px; font-weight:700;
+}
+#crTimer, #crRoundCoins { padding:2px 8px; border-radius:10px; background:#222; }
+#crCloseBtn{ border:none; border-radius:10px; padding:4px 8px; cursor:pointer; background:#444; color:#fff; }
+#crPlayfield{ position:absolute; inset:0; overflow:hidden; }
+.cr-coin{
+  position:absolute; top:-60px; cursor:pointer; user-select:none;
+  width:56px; height:56px;
+  background-image: url("assets/coin.png");
+  background-repeat: no-repeat; background-size: contain;
+  will-change: transform; animation: cr-fall var(--fall-ms, 2600ms) linear forwards;
+  touch-action: manipulation;
+}
+.cr-coin::after{
+  content:""; position:absolute; left:8px; right:8px; bottom:-6px; height:6px;
+  background: radial-gradient(closest-side, rgba(0,0,0,0.25), transparent);
+  transform: translateX(var(--drift, 0));
+}
+.cr-pop{ transform: scale(1.12); transition: transform 140ms ease; }
+@keyframes cr-fall {
+  0% { transform: translate(0, -80px); opacity: 0.98; }
+  100% { transform: translate(var(--drift, 0), 100vh); opacity: 0.98; }
+}
+
+
