@@ -571,17 +571,46 @@ function collectCoin(coinEl) {
   setTimeout(() => coinEl.remove(), 180);
 }
 
+// --- PATCH 2: replace these two functions in the Coin Rain section ---
+
 function endCoinRain() {
   if (!crState) return;
+
+  // stop timers
   cancelAnimationFrame(crState.timerId);
   clearTimeout(crState.spawnId);
 
+  // disable playfield interactions and clear remaining coins (prevents blocking clicks)
+  const playfield = document.getElementById("crPlayfield");
+  if (playfield) {
+    playfield.style.pointerEvents = "none";
+    playfield.querySelectorAll(".cr-coin").forEach(n => n.remove());
+  }
+
+  // show summary above everything
   const s = document.getElementById("crSummary");
   const txt = document.getElementById("crSummaryText");
-  txt.textContent = `You caught ${crState.caught} coin${crState.caught === 1 ? "" : "s"}!`;
-  s.style.display = "block";
+  if (txt) txt.textContent = `You caught ${crState.caught} coin${crState.caught === 1 ? "" : "s"}!`;
+  if (s) s.style.display = "block";
 
   crState = null;
+}
+
+function closeCoinRain() {
+  const overlay = document.getElementById("coinRainOverlay");
+  if (!overlay) return;
+
+  // reset playfield for next round
+  const playfield = document.getElementById("crPlayfield");
+  if (playfield) {
+    playfield.innerHTML = "";
+    playfield.style.pointerEvents = "auto";
+  }
+
+  const s = document.getElementById("crSummary");
+  if (s) s.style.display = "none";
+
+  overlay.style.display = "none";
 }
 
 function endCoinRainEarly() {
