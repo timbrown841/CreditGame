@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateXPUI();
   showIntroModule();
   wireShopModal();
+  preloadCoinImage();      // avoids first-tap lag in the mini-game
 });
 
 /* ======= QUIZ BANKS ======= */
@@ -154,6 +155,7 @@ async function showIntroModule() {
       <strong>🎯 Daily Challenge:</strong> ${daily.label} — Reward: +${DAILY_REWARD} coins
       <div style="margin-top:.5rem;">
         <button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
+        <button onclick="openCoinRain()">🪙 Coin Rain</button>   <!-- add this line -->
         <button onclick="openShop()">🛍️ Shop</button>
       </div>
     </div>
@@ -468,6 +470,128 @@ function triggerConfetti() {
     document.body.appendChild(s);
     setTimeout(() => s.remove(), 1000);
   }
+}
+
+/* === COIN RAIN MINI-GAME === */
+const COIN_RAIN_DURATION_MS = 20000;
+
+// Preload sprite to avoid first-tap jank
+let _coinImgPreloaded = false;
+function preloadCoinImage() {
+  if (_coinImgPreloaded) return;
+  const img = new Image();
+  img.src = "assets/coin.png";
+  img.onload = () => { _coinImgPreloaded = true; };
+}
+
+// Ensure overlay exists once
+function ensureCoinRainDOM() {
+  if (document.getElementById("coinRainOverlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "coinRainOverlay";
+  overlay.innerHTML = `
+    <div class="cr-hud">
+      <span id="crTimer">20s</span>
+      <span id="crRoundCoins">+0</span>
+      <button id="crCloseBtn" type="button">✖</button>
+    </div>
+    <div id="crPlayfield"></div>
+    <div id="crSummary" class="cr-summary" style="display:none;">
+      <h3>Time!</h3>
+      <p id="crSummaryText"></p>
+      <button type="button" id="crDoneBtn">Back</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector("#crCloseBtn").addEventListener("click", endCoinRainEarly);
+  overlay.querySelector("#crDoneBtn").addEventListener("click", closeCoinRain);
+}
+
+let crState = null; // { start, timerId, spawnId, caught }
+
+function openCoinRain() {
+  preloadCoinImage();
+  ensureCoinRainDOM();
+  const overlay = document.getElementById("coinRainOverlay");
+  overlay.style.display = "flex";
+  startCoinRain();
+}
+
+function startCoinRain() {
+  const playfield = document.getElementById("crPlayfield");
+  const timerEl = document.getElementById("crTimer");
+  const roundEl = document.getElementById("crRoundCoins");
+  playfield.innerHTML = "";
+  document.getElementById("crSummary").style.display = "none";
+
+  crState = { start: performance.now(), caught: 0, timerId: null, spawnId: null };
+
+  function tick() {
+    const elapsed = performance.now() - crState.start;
+    const remain = Math.max(0, COIN_RAIN_DURATION_MS - elapsed);
+    timerEl.textContent = Math.ceil(remain / 1000) + "s";
+    if (remain <= 0) return endCoinRain();
+    crState.timerId = requestAnimationFrame(tick);
+  }
+  crState.timerId = requestAnimationFrame(tick);
+
+  function scheduleSpawn() {
+    const delay = 450 + Math.random() * 150; // 450–600ms
+    crState.spawnId = setTimeout(() => { spawnCoin(playfield); scheduleSpawn(); }, delay);
+  }
+  scheduleSpawn();
+
+  roundEl.textContent = "+0";
+}
+
+function spawnCoin(containerEl) {
+  const coin = document.createElement("div");
+  coin.className = "cr-coin";
+  coin.setAttribute("aria-label", "coin");
+
+  const maxX = Math.max(0, window.innerWidth - 56); // width from CSS
+  const left = Math.floor(Math.random() * maxX);
+  coin.style.left = left + "px";
+  coin.style.setProperty("--fall-ms", (2200 + Math.random() * 1600) + "ms");
+  coin.style.setProperty("--drift", (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 25) + "px");
+
+  coin.addEventListener("click", () => collectCoin(coin), { once: true, passive: true });
+
+  containerEl.appendChild(coin);
+  setTimeout(() => coin.remove(), 4500);
+}
+
+function collectCoin(coinEl) {
+  if (!crState) return;
+  crState.caught += 1;
+  document.getElementById("crRoundCoins").textContent = `+${crState.caught}`;
+  try { awardCoins(1); floatCoin("+1"); } catch {}
+  coinEl.classList.add("cr-pop");
+  setTimeout(() => coinEl.remove(), 180);
+}
+
+function endCoinRain() {
+  if (!crState) return;
+  cancelAnimationFrame(crState.timerId);
+  clearTimeout(crState.spawnId);
+
+  const s = document.getElementById("crSummary");
+  const txt = document.getElementById("crSummaryText");
+  txt.textContent = `You caught ${crState.caught} coin${crState.caught === 1 ? "" : "s"}!`;
+  s.style.display = "block";
+
+  crState = null;
+}
+
+function endCoinRainEarly() {
+  if (!crState) return closeCoinRain();
+  endCoinRain();
+}
+
+function closeCoinRain() {
+  const overlay = document.getElementById("coinRainOverlay");
+  if (overlay) overlay.style.display = "none";
 }
 
 /* ======= UTILS ======= */
