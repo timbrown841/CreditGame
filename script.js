@@ -430,8 +430,36 @@ function daysBetween(a, b) {
 }
 
 /* ======= SHOP / COSMETICS ======= */
-function openShop(){ const m=document.getElementById("shopModal"); if(m){ m.style.display="flex"; renderShopItems(); } }
-function wireShopModal(){ document.getElementById("closeShopBtn")?.addEventListener("click", ()=>{ const m=document.getElementById("shopModal"); if(m) m.style.display="none"; }); }
+function openShop(){
+  const m = document.getElementById("shopModal");
+  if (!m) return;
+  document.body.classList.add("no-scroll");  // lock background
+  m.style.display = "flex";
+  renderShopItems();
+}
+
+function wireShopModal(){
+  const closeBtn = document.getElementById("closeShopBtn");
+  if (closeBtn){
+    closeBtn.addEventListener("click", () => {
+      const m = document.getElementById("shopModal");
+      if (m) m.style.display = "none";
+      document.body.classList.remove("no-scroll"); // unlock background
+    });
+  }
+
+   // Optional: click overlay (outside panel) to close
+  const modal = document.getElementById("shopModal");
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      // only if user clicks the overlay, not the inner panel
+      if (e.target === modal) {
+        modal.style.display = "none";
+        document.body.classList.remove("no-scroll");
+      }
+    });
+  }
+}
 
 function ownKey(id){ return "own_"+id; }
 function isOwned(it){ return it.type==="powerup" ? false : localStorage.getItem(ownKey(it.id))==="1"; }
