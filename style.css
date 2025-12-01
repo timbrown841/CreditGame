@@ -303,6 +303,39 @@ button:hover {
 
 /* Pills already exist; add streak color and XP bar */
 .pill.streak { background: rgba(255, 165, 0, .9); color:#000; font-weight:700; }
+/* Base pill (used by Coins + Boost) */
+.pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* Booster pill look + subtle glow */
+#boostPill {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 rgba(255, 215, 0, 0.0);
+  animation: boostPulse 1.6s ease-in-out infinite;
+}
+#boostPill::before { content: "⚡ "; }
+
+/* Spacing inside avatar header */
+.avatar-container .pill {
+  margin-top: 6px;
+  margin-right: 6px;
+}
+
+/* Glow animation */
+@keyframes boostPulse {
+  0%   { box-shadow: 0 0 0 rgba(255, 215, 0, 0.0); }
+  50%  { box-shadow: 0 0 12px 2px rgba(255, 215, 0, 0.6); }
+  100% { box-shadow: 0 0 0 rgba(255, 215, 0, 0.0); }
+}
+
 
 /* XP bar */
 .xp-bar { max-width: 400px; width: 100%; margin: .5rem auto 0; text-align: left; }
