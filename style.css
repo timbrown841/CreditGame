@@ -413,5 +413,34 @@ button:hover {
   text-align: center;
 }
 
+/* --- Shop modal: overlay + scrollable panel --- */
+#shopModal{
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: none;                     /* toggled by JS */
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(2px);
+}
 
+/* Use your existing .container inside the modal as the panel */
+#shopModal .container{
+  width: min(92vw, 560px);
+  max-height: 88vh;                  /* <<< key: panel scroll bound */
+  overflow-y: auto;                  /* <<< panel scrolls */
+  background: rgba(0,0,0,0.85);
+  padding: 16px;
+  border-radius: 16px;
+}
 
+/* Items grid can scroll too if it grows tall */
+#shopItems{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+/* Lock background page scroll while modal is open */
+body.no-scroll{ overflow: hidden; }
