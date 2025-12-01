@@ -13,11 +13,21 @@ const XP_PER_CORRECT = 5;
 const XP_BASE_TO_LEVEL = 20;
 
 const SHOP_ITEMS = [
-  { id: "frame-gold", name: "Gold Frame", cost: 15, color: "gold" },
-  { id: "frame-cyan", name: "Cyan Frame", cost: 10, color: "#00c4cc" },
-  { id: "frame-pink", name: "Pink Frame", cost: 10, color: "hotpink" },
-  { id: "frame-lime", name: "Lime Frame", cost: 8,  color: "limegreen" }
+  { id: "frame-gold",  type: "frame",  name: "Gold Frame",  cost: 15, color: "gold" },
+  { id: "frame-cyan",  type: "frame",  name: "Cyan Frame",  cost: 10, color: "#00c4cc" },
+  { id: "frame-pink",  type: "frame",  name: "Pink Frame",  cost: 10, color: "hotpink" },
+  { id: "frame-lime",  type: "frame",  name: "Lime Frame",  cost: 8,  color: "limegreen" },
+  { id: "trail-sky",   type: "trail",  name: "Sky Trail",   cost: 8,  color: "#aee7ff" },
+  { id: "trail-sunset",type: "trail",  name: "Sunset Trail",cost: 10, color: "#ff8a00" },
+  { id: "trail-mint",  type: "trail",  name: "Mint Trail",  cost: 8,  color: "#a2ffcc" },
+  { id: "bg-space",    type: "bg",     name: "Space",       cost: 12, asset: "assets/bg-space.jpg" },
+  { id: "bg-city",     type: "bg",     name: "City",        cost: 12, asset: "assets/bg-city.jpg" },
+  { id: "bg-ocean",    type: "bg",     name: "Ocean",       cost: 12, asset: "assets/bg-ocean.jpg" },
+  { id: "av-robot",    type: "avatar", name: "Robot",       cost: 20, asset: "assets/avatars/robot.jpg" },
+  { id: "av-owl",      type: "avatar", name: "Owl",         cost: 20, asset: "assets/avatars/owl.jpg" },
+  { id: "boost-2x-30", type: "powerup",name: "2x Coins (30m)", cost: 25, x: 2, minutes: 30 },
 ];
+
 
 /* ======= STATE ======= */
 let container;
@@ -42,6 +52,9 @@ let lastPlay = localStorage.getItem("lastPlay") || "";
 let xp = Number(localStorage.getItem("xp") || 0);
 let level = Number(localStorage.getItem("level") || 1);
 let chosenFrame = localStorage.getItem("avatarFrame") || "";
+let chosenTrail  = localStorage.getItem("trailId") || "";
+let chosenTheme  = localStorage.getItem("themeId") || "";
+let boosterUntil = Number(localStorage.getItem("boosterUntil") || 0);
 
 /* ======= BOOT ======= */
 document.addEventListener("DOMContentLoaded", () => {
@@ -56,6 +69,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setText("displayName", `Welcome, ${name}!`);
   const avatarEl = document.getElementById("avatarDisplay");
   if (avatarEl) { avatarEl.src = `assets/avatars/${avatar}`; applyAvatarFrame(avatarEl, chosenFrame); }
+  applyTrail(chosenTrail);
+  applyTheme(chosenTheme);
+  renderBoostPill();
 
   document.getElementById("loginContainer")?.remove();
   const qc = document.getElementById("quizContainer"); if (qc) qc.style.display = "block";
@@ -328,15 +344,31 @@ function completeDailyIfEligible() {
 }
 
 /* ======= COINS / XP / STREAKS ======= */
+function isBoosterActive(){ return Date.now() < boosterUntil; }
+function boosterMultiplier(){ return isBoosterActive() ? 2 : 1; }
+function renderBoostPill(){
+  const pill = document.getElementById("boostPill");
+  if (!pill) return;
+  if (isBoosterActive()) {
+    const mins = Math.max(0, Math.ceil((boosterUntil - Date.now())/60000));
+    pill.style.display = "inline-block";
+    pill.textContent = `⚡ 2x Coins · ${mins}m`;
+  } else pill.style.display = "none";
+}
+
 function awardCoins(amount) {
-  currentCoins += amount;
+  const mult = amount > 0 ? boosterMultiplier() : 1;
+  const delta = amount * mult;
+  currentCoins += delta;
   localStorage.setItem("playerCoins", String(currentCoins));
   updateCoinsUI();
   fetch(`${apiBase}/reward-coins`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: localStorage.getItem("playerName"), amount })
+    body: JSON.stringify({ username: localStorage.getItem("playerName"), amount: delta })
   }).catch(() => {});
 }
+setInterval(renderBoostPill, 15000);
+
 
 function updateCoinsUI() {
   setText("coinCount", `🪙 Coins: ${currentCoins}`);
@@ -398,41 +430,96 @@ function daysBetween(a, b) {
 }
 
 /* ======= SHOP / COSMETICS ======= */
-function openShop() { const m = document.getElementById("shopModal"); if (m) { m.style.display = "flex"; renderShopItems(); } }
-function wireShopModal() { document.getElementById("closeShopBtn")?.addEventListener("click", () => { const m = document.getElementById("shopModal"); if (m) m.style.display = "none"; }); }
-function renderShopItems() {
-  const grid = document.getElementById("shopItems"); if (!grid) return;
-  grid.innerHTML = SHOP_ITEMS.map(it => {
-    const owned = localStorage.getItem("own_"+it.id) === "1";
-    const using = chosenFrame === it.id;
-    return `
-      <div class="shop-item">
-        <div class="frame-preview" style="border-color:${it.color}"></div>
-        <div><strong>${it.name}</strong></div>
-        <div>${owned ? "Owned" : `Cost: ${it.cost} 🪙`}</div>
-        <div style="margin-top:.25rem;">
-          ${owned
-            ? `<button onclick="equipFrame('${it.id}')" ${using ? "disabled" : ""}>${using ? "Equipped" : "Equip"}</button>`
-            : `<button onclick="buyFrame('${it.id}')">Buy</button>`
-          }
-        </div>
-      </div>`;
+function openShop(){ const m=document.getElementById("shopModal"); if(m){ m.style.display="flex"; renderShopItems(); } }
+function wireShopModal(){ document.getElementById("closeShopBtn")?.addEventListener("click", ()=>{ const m=document.getElementById("shopModal"); if(m) m.style.display="none"; }); }
+
+function ownKey(id){ return "own_"+id; }
+function isOwned(it){ return it.type==="powerup" ? false : localStorage.getItem(ownKey(it.id))==="1"; }
+function isUsing(it){
+  if (it.type==="frame")  return chosenFrame===it.id;
+  if (it.type==="trail")  return chosenTrail===it.id;
+  if (it.type==="bg")     return chosenTheme===it.id;
+  if (it.type==="avatar") return (localStorage.getItem("playerAvatar")||"").endsWith(it.asset.split("/").pop());
+  return false;
+}
+
+function renderShopItems(){
+  const grid=document.getElementById("shopItems"); if(!grid) return;
+  grid.innerHTML = SHOP_ITEMS.map(it=>{
+    const owned=isOwned(it), using=isUsing(it);
+    const preview = it.type==="frame"  ? `<div class="frame-preview" style="border-color:${it.color}"></div>` :
+                   it.type==="trail"   ? `<div class="trail-preview" style="background:linear-gradient(${it.color}, transparent); height:32px;"></div>` :
+                   it.type==="bg"      ? `<div class="bg-preview" style="width:64px;height:36px;border-radius:8px;background:url('${it.asset}') center/cover;"></div>` :
+                   it.type==="avatar"  ? `<img alt="${it.name}" src="${it.asset}" style="width:48px;height:48px;border-radius:50%;border:2px solid #fff;">` :
+                   it.type==="powerup" ? `<div class="power-preview" style="font-weight:700;">⚡ ${it.x}x / ${it.minutes}m</div>` : "";
+    const status = it.type==="powerup" ? `Cost: ${it.cost} 🪙` : (owned ? (using?"Equipped":"Owned") : `Cost: ${it.cost} 🪙`);
+    const cta = it.type==="powerup" ? `<button onclick="activatePowerup('${it.id}')">Activate</button>`
+      : (!owned ? `<button onclick="buyItem('${it.id}')">Buy</button>` : (!using ? `<button onclick="equipItem('${it.id}')">Equip</button>` : `<button disabled>Equipped</button>`));
+    return `<div class="shop-item">${preview}<div><strong>${it.name}</strong></div><div>${status}</div><div style="margin-top:.25rem;">${cta}</div></div>`;
   }).join("");
 }
-function buyFrame(id) {
-  const it = SHOP_ITEMS.find(x=>x.id===id); if (!it) return;
+
+function buyItem(id){
+  const it=SHOP_ITEMS.find(x=>x.id===id); if(!it) return;
+  if (isOwned(it)) return renderShopItems();
   if (currentCoins < it.cost) { alert("Not enough coins"); return; }
-  awardCoins(-it.cost); localStorage.setItem("own_"+id, "1"); renderShopItems();
-}
-function equipFrame(id) {
-  chosenFrame = id; localStorage.setItem("avatarFrame", id);
-  const avatarEl = document.getElementById("avatarDisplay"); if (avatarEl) applyAvatarFrame(avatarEl, id);
+  awardCoins(-it.cost); localStorage.setItem(ownKey(it.id),"1");
+  if (it.type==="avatar"){
+    const filename = it.asset.split("/").pop();
+    localStorage.setItem("playerAvatar", filename);
+    const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) avatarEl.src=`assets/avatars/${filename}`;
+  }
   renderShopItems();
 }
-function applyAvatarFrame(imgEl, id) {
-  const item = SHOP_ITEMS.find(x=>x.id===id);
-  if (!item) { imgEl.style.boxShadow = ""; imgEl.style.borderColor=""; imgEl.style.borderWidth="2px"; return; }
-  imgEl.style.borderColor = item.color; imgEl.style.borderWidth = "4px";
+
+function equipItem(id){
+  const it=SHOP_ITEMS.find(x=>x.id===id); if(!it) return;
+  if (it.type==="frame"){
+    chosenFrame=id; localStorage.setItem("avatarFrame", id);
+    const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) applyAvatarFrame(avatarEl, id);
+  } else if (it.type==="trail"){
+    chosenTrail=id; localStorage.setItem("trailId", id); applyTrail(id);
+  } else if (it.type==="bg"){
+    chosenTheme=id; localStorage.setItem("themeId", id); applyTheme(id);
+  } else if (it.type==="avatar"){
+    const filename = it.asset.split("/").pop();
+    localStorage.setItem("playerAvatar", filename);
+    const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) avatarEl.src=`assets/avatars/${filename}`;
+  }
+  renderShopItems();
+}
+
+function activatePowerup(id){
+  const it=SHOP_ITEMS.find(x=>x.id===id && x.type==="powerup"); if(!it) return;
+  if (currentCoins < it.cost) { alert("Not enough coins"); return; }
+  awardCoins(-it.cost);
+  boosterUntil = Date.now() + it.minutes*60*1000;
+  localStorage.setItem("boosterUntil", String(boosterUntil));
+  alert(`⚡ ${it.x}x coins active for ${it.minutes} minutes`);
+  renderBoostPill();
+}
+
+/* Replaces your old applyAvatarFrame + adds trail/theme appliers */
+function applyAvatarFrame(imgEl, id){
+  const item = SHOP_ITEMS.find(x=>x.id===id && x.type==="frame");
+  if (!item){ imgEl.style.boxShadow=""; imgEl.style.borderColor=""; imgEl.style.borderWidth="2px"; return; }
+  imgEl.style.borderColor=item.color; imgEl.style.borderWidth="4px";
+}
+function applyTrail(id){
+  const el=document.querySelector(".rocket-trail"); if(!el) return;
+  const item=SHOP_ITEMS.find(x=>x.id===id && x.type==="trail");
+  if(!item){ el.style.background="linear-gradient(#fff, transparent)"; return; }
+  el.style.background=`linear-gradient(${item.color}, transparent)`;
+}
+function applyTheme(id){
+  const item=SHOP_ITEMS.find(x=>x.id===id && x.type==="bg");
+  const body=document.body;
+  if(!item){
+    body.style.backgroundImage="url('assets/bg-kids.jpg')";
+    body.style.backgroundSize="cover"; body.style.backgroundPosition="center"; return;
+  }
+  body.style.backgroundImage=`url('${item.asset}')`;
+  body.style.backgroundSize="cover"; body.style.backgroundPosition="center";
 }
 
 /* ======= AUDIO / EFFECTS ======= */
