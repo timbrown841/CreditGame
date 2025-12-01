@@ -1,7 +1,8 @@
-/* File: script.js — full, fixed */
+/* File: script.js — full app (quiz + daily + shop + coin rain + server inventory) */
 
 const apiBase = "https://credit-api-uhou.onrender.com";
 
+/* ======= CONSTANTS ======= */
 const COINS_PER_CORRECT = 1;
 const DAILY_REWARD = 5;
 const DAILY_COUNT = 3;
@@ -12,31 +13,42 @@ const STREAK_MAX_BONUS = 7;
 const XP_PER_CORRECT = 5;
 const XP_BASE_TO_LEVEL = 20;
 
+const COIN_RAIN_DURATION_MS = 20000;
+
+/* ======= SHOP CATALOG ======= */
 const SHOP_ITEMS = [
+  // Frames
   { id: "frame-gold",  type: "frame",  name: "Gold Frame",  cost: 15, color: "gold" },
   { id: "frame-cyan",  type: "frame",  name: "Cyan Frame",  cost: 10, color: "#00c4cc" },
   { id: "frame-pink",  type: "frame",  name: "Pink Frame",  cost: 10, color: "hotpink" },
   { id: "frame-lime",  type: "frame",  name: "Lime Frame",  cost: 8,  color: "limegreen" },
+
+  // Trails
   { id: "trail-sky",   type: "trail",  name: "Sky Trail",   cost: 8,  color: "#aee7ff" },
   { id: "trail-sunset",type: "trail",  name: "Sunset Trail",cost: 10, color: "#ff8a00" },
   { id: "trail-mint",  type: "trail",  name: "Mint Trail",  cost: 8,  color: "#a2ffcc" },
+
+  // Backgrounds
   { id: "bg-space",    type: "bg",     name: "Space",       cost: 12, asset: "assets/bg-space.jpg" },
   { id: "bg-city",     type: "bg",     name: "City",        cost: 12, asset: "assets/bg-city.jpg" },
   { id: "bg-ocean",    type: "bg",     name: "Ocean",       cost: 12, asset: "assets/bg-ocean.jpg" },
+
+  // Avatars (optional extras)
   { id: "av-robot",    type: "avatar", name: "Robot",       cost: 20, asset: "assets/avatars/robot.jpg" },
   { id: "av-owl",      type: "avatar", name: "Owl",         cost: 20, asset: "assets/avatars/owl.jpg" },
-  { id: "boost-2x-30", type: "powerup",name: "2x Coins (30m)", cost: 25, x: 2, minutes: 30 },
-];
 
+  // Power-up
+  { id: "boost-2x-30", type: "powerup", name: "2x Coins (30m)", cost: 25, x: 2, minutes: 30 },
+];
 
 /* ======= STATE ======= */
 let container;
 let currentCoins = 0;
 let correctAnswers = 0;
 
-let currentMode = "normal";           // "normal" | "daily"
+let currentMode = "normal";            // "normal" | "daily"
 let currentLevelKey = "easy";
-let currentBank = [];                 // active questions
+let currentBank = [];
 let currentIndex = 0;
 
 let unlockedLevels =
@@ -51,31 +63,36 @@ let streak = Number(localStorage.getItem("streak") || 0);
 let lastPlay = localStorage.getItem("lastPlay") || "";
 let xp = Number(localStorage.getItem("xp") || 0);
 let level = Number(localStorage.getItem("level") || 1);
-let chosenFrame = localStorage.getItem("avatarFrame") || "";
+
+// Equipped cosmetics + powerup
+let chosenFrame  = localStorage.getItem("avatarFrame") || "";
 let chosenTrail  = localStorage.getItem("trailId") || "";
 let chosenTheme  = localStorage.getItem("themeId") || "";
 let boosterUntil = Number(localStorage.getItem("boosterUntil") || 0);
 
 /* ======= BOOT ======= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const name = (localStorage.getItem("playerName") || "").trim();
   const avatar = localStorage.getItem("playerAvatar");
-  if (!name || !avatar) {
-    window.location.href = "login.html"; return;
-  }
+  if (!name || !avatar) { window.location.href = "login.html"; return; }
 
   currentCoins = Number(localStorage.getItem("playerCoins") || 0) || 0;
 
   setText("displayName", `Welcome, ${name}!`);
   const avatarEl = document.getElementById("avatarDisplay");
   if (avatarEl) { avatarEl.src = `assets/avatars/${avatar}`; applyAvatarFrame(avatarEl, chosenFrame); }
-  applyTrail(chosenTrail);
-  applyTheme(chosenTheme);
-  renderBoostPill();
 
   document.getElementById("loginContainer")?.remove();
   const qc = document.getElementById("quizContainer"); if (qc) qc.style.display = "block";
   container = document.getElementById("quizContent") || document.body;
+
+  // Server inventory sync (owned/equipped/coins/booster)
+  await syncInventoryFromServer();
+
+  // Apply cosmetics after sync
+  applyTrail(chosenTrail);
+  applyTheme(chosenTheme);
+  renderBoostPill();
 
   if (!localStorage.getItem("unlockedLevels"))
     localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
@@ -85,9 +102,10 @@ document.addEventListener("DOMContentLoaded", () => {
   handleDailyStreak();
   updateCoinsUI();
   updateXPUI();
+
   showIntroModule();
   wireShopModal();
-  preloadCoinImage();      // avoids first-tap lag in the mini-game
+  preloadCoinImage?.(); // for Coin Rain PNG
 });
 
 /* ======= QUIZ BANKS ======= */
@@ -152,8 +170,8 @@ function getTodayDailySet() {
   return pool.slice(0, DAILY_COUNT);
 }
 
-/* ======= UI ======= */
-async function showIntroModule() {
+/* ======= UI / MENU ======= */
+function showIntroModule() {
   const name = localStorage.getItem("playerName") || "Player";
   const daily = getTodayDailyMeta();
 
@@ -169,9 +187,9 @@ async function showIntroModule() {
 
     <div class="quiz-summary" style="margin-top:.5rem;">
       <strong>🎯 Daily Challenge:</strong> ${daily.label} — Reward: +${DAILY_REWARD} coins
-      <div style="margin-top:.5rem;">
+      <div style="margin-top:.5rem; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
         <button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
-        <button onclick="openCoinRain()">🪙 Coin Rain</button>   <!-- add this line -->
+        <button onclick="openCoinRain()">🪙 Coin Rain</button>
         <button onclick="openShop()">🛍️ Shop</button>
       </div>
     </div>
@@ -187,7 +205,7 @@ async function showIntroModule() {
   const xpBar = document.getElementById("xpBar"); if (xpBar) xpBar.style.display = "block";
 }
 
-/* START normal quiz */
+/* ======= QUIZ FLOW ======= */
 function startQuiz(levelKey) {
   currentMode = "normal";
   currentLevelKey = levelKey;
@@ -197,7 +215,6 @@ function startQuiz(levelKey) {
   renderQuestion();
 }
 
-/* START daily challenge */
 function startDaily() {
   currentMode = "daily";
   currentBank = getTodayDailySet();
@@ -207,7 +224,6 @@ function startDaily() {
   renderQuestion();
 }
 
-/* RENDER current question (fixed handler) */
 function renderQuestion() {
   const q = currentBank[currentIndex];
   if (!q) { showQuizSummary(); return; }
@@ -236,7 +252,7 @@ function renderQuestion() {
     btn.addEventListener("click", (e) => {
       document.querySelectorAll(".optionBtn").forEach(b => b.disabled = true);
 
-      const idx = parseInt(e.currentTarget.dataset.index, 10); // crucial fix
+      const idx = parseInt(e.currentTarget.dataset.index, 10); // crucial: currentTarget
       const isCorrect = Number.isInteger(idx) && idx === q.correct;
 
       if (isCorrect) {
@@ -251,29 +267,22 @@ function renderQuestion() {
       }
 
       currentIndex++;
-      if (currentIndex < currentBank.length) {
-        renderQuestion();            // advance reliably
-      } else {
-        showQuizSummary();
-      }
-    }, { once: true });               // bind once per render
+      if (currentIndex < currentBank.length) renderQuestion();
+      else showQuizSummary();
+    }, { once: true });
   });
 }
 
-/* SUMMARY */
 function showQuizSummary() {
   const total = currentBank.length;
   const stars = "⭐".repeat(correctAnswers) + "☆".repeat(total - correctAnswers);
 
-  let msg = "";
   if (currentMode === "daily") {
-    msg = correctAnswers === total ? "🎉 Daily complete!" : "Daily finished!";
     completeDailyIfEligible();
     container.innerHTML = `
       <div class="quiz-summary">
         <h2>Daily Summary</h2>
         <p>${correctAnswers}/${total} correct</p>
-        <p>${msg}</p>
         <button onclick="startDaily()">🔁 Try Again</button>
         <button onclick="showIntroModule()">🔙 Back to Menu</button>
       </div>
@@ -281,6 +290,7 @@ function showQuizSummary() {
     return;
   }
 
+  let msg = "";
   if (correctAnswers === total) { msg = "🎉 Perfect!"; unlockNextLevel(currentLevelKey); playWin(); }
   else if (correctAnswers >= Math.floor(total * 0.7)) { msg = "👏 Great job!"; }
   else { msg = "🧐 Keep practicing!"; }
@@ -305,14 +315,8 @@ function unlockNextLevel(levelKey) {
     localStorage.setItem("levelTrophies", JSON.stringify(levelTrophies));
     changed = true;
   }
-
-  if (levelKey === "easy" && !unlockedLevels.medium) {
-    unlockedLevels.medium = true;
-    changed = true;
-  } else if (levelKey === "medium" && !unlockedLevels.hard) {
-    unlockedLevels.hard = true;
-    changed = true;
-  }
+  if (levelKey === "easy" && !unlockedLevels.medium) { unlockedLevels.medium = true; changed = true; }
+  else if (levelKey === "medium" && !unlockedLevels.hard) { unlockedLevels.hard = true; changed = true; }
 
   if (changed) {
     localStorage.setItem("unlockedLevels", JSON.stringify(unlockedLevels));
@@ -320,7 +324,7 @@ function unlockNextLevel(levelKey) {
   }
 }
 
-/* ======= DAILY META / COMPLETION (local) ======= */
+/* ======= DAILY META / COMPLETION (local only) ======= */
 function getTodayDailyMeta() {
   const todayKey = new Date().toISOString().slice(0,10);
   const key = `daily-${todayKey}`;
@@ -355,20 +359,22 @@ function renderBoostPill(){
     pill.textContent = `⚡ 2x Coins · ${mins}m`;
   } else pill.style.display = "none";
 }
+setInterval(renderBoostPill, 15000);
 
 function awardCoins(amount) {
+  // why: do not multiply negative spends
   const mult = amount > 0 ? boosterMultiplier() : 1;
   const delta = amount * mult;
+
   currentCoins += delta;
   localStorage.setItem("playerCoins", String(currentCoins));
   updateCoinsUI();
+
   fetch(`${apiBase}/reward-coins`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username: localStorage.getItem("playerName"), amount: delta })
   }).catch(() => {});
 }
-setInterval(renderBoostPill, 15000);
-
 
 function updateCoinsUI() {
   setText("coinCount", `🪙 Coins: ${currentCoins}`);
@@ -429,30 +435,29 @@ function daysBetween(a, b) {
   return Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
 }
 
-/* ======= SHOP / COSMETICS ======= */
+/* ======= SHOP (server-persisted) ======= */
 function openShop(){
   const m = document.getElementById("shopModal");
   if (!m) return;
-  document.body.classList.add("no-scroll");  // lock background
+  document.body.classList.add("no-scroll"); // lock background
   m.style.display = "flex";
   renderShopItems();
 }
 
-function wireShopModal(){
+function wireShopModal() {
+  // Close button
   const closeBtn = document.getElementById("closeShopBtn");
-  if (closeBtn){
+  if (closeBtn) {
     closeBtn.addEventListener("click", () => {
       const m = document.getElementById("shopModal");
       if (m) m.style.display = "none";
       document.body.classList.remove("no-scroll"); // unlock background
     });
   }
-
-   // Optional: click overlay (outside panel) to close
+  // Click overlay to close
   const modal = document.getElementById("shopModal");
   if (modal) {
     modal.addEventListener("click", (e) => {
-      // only if user clicks the overlay, not the inner panel
       if (e.target === modal) {
         modal.style.display = "none";
         document.body.classList.remove("no-scroll");
@@ -472,9 +477,9 @@ function isUsing(it){
 }
 
 function renderShopItems(){
-  const grid=document.getElementById("shopItems"); if(!grid) return;
-  grid.innerHTML = SHOP_ITEMS.map(it=>{
-    const owned=isOwned(it), using=isUsing(it);
+  const grid = document.getElementById("shopItems"); if (!grid) return;
+  grid.innerHTML = SHOP_ITEMS.map(it => {
+    const owned = isOwned(it), using = isUsing(it);
     const preview = it.type==="frame"  ? `<div class="frame-preview" style="border-color:${it.color}"></div>` :
                    it.type==="trail"   ? `<div class="trail-preview" style="background:linear-gradient(${it.color}, transparent); height:32px;"></div>` :
                    it.type==="bg"      ? `<div class="bg-preview" style="width:64px;height:36px;border-radius:8px;background:url('${it.asset}') center/cover;"></div>` :
@@ -487,47 +492,124 @@ function renderShopItems(){
   }).join("");
 }
 
-function buyItem(id){
-  const it=SHOP_ITEMS.find(x=>x.id===id); if(!it) return;
-  if (isOwned(it)) return renderShopItems();
-  if (currentCoins < it.cost) { alert("Not enough coins"); return; }
-  awardCoins(-it.cost); localStorage.setItem(ownKey(it.id),"1");
-  if (it.type==="avatar"){
-    const filename = it.asset.split("/").pop();
-    localStorage.setItem("playerAvatar", filename);
-    const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) avatarEl.src=`assets/avatars/${filename}`;
-  }
-  renderShopItems();
+/* Server-backed buy/equip + sync */
+async function syncInventoryFromServer() {
+  try {
+    const username = (localStorage.getItem("playerName") || "").trim();
+    if (!username) return;
+
+    const res = await fetch(`${apiBase}/inventory?username=` + encodeURIComponent(username));
+    if (!res.ok) return;
+    const inv = await res.json();
+
+    (inv.ownedItems || []).forEach(id => localStorage.setItem("own_" + id, "1"));
+
+    if (inv.avatarFrame) {
+      localStorage.setItem("avatarFrame", inv.avatarFrame);
+      chosenFrame = inv.avatarFrame;
+      const avatarEl = document.getElementById("avatarDisplay");
+      if (avatarEl) applyAvatarFrame(avatarEl, chosenFrame);
+    }
+    if (inv.trailId) {
+      localStorage.setItem("trailId", inv.trailId);
+      chosenTrail = inv.trailId;
+    }
+    if (inv.themeId) {
+      localStorage.setItem("themeId", inv.themeId);
+      chosenTheme = inv.themeId;
+    }
+    if (typeof inv.boosterUntil === "number") {
+      localStorage.setItem("boosterUntil", String(inv.boosterUntil));
+      boosterUntil = inv.boosterUntil;
+    }
+    if (Number.isFinite(inv.coins)) {
+      currentCoins = inv.coins;
+      localStorage.setItem("playerCoins", String(currentCoins));
+    }
+    if (inv.avatar) {
+      localStorage.setItem("playerAvatar", inv.avatar);
+      const avatarEl = document.getElementById("avatarDisplay");
+      if (avatarEl) avatarEl.src = `assets/avatars/${inv.avatar}`;
+    }
+  } catch {}
 }
 
-function equipItem(id){
-  const it=SHOP_ITEMS.find(x=>x.id===id); if(!it) return;
-  if (it.type==="frame"){
-    chosenFrame=id; localStorage.setItem("avatarFrame", id);
-    const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) applyAvatarFrame(avatarEl, id);
-  } else if (it.type==="trail"){
-    chosenTrail=id; localStorage.setItem("trailId", id); applyTrail(id);
-  } else if (it.type==="bg"){
-    chosenTheme=id; localStorage.setItem("themeId", id); applyTheme(id);
-  } else if (it.type==="avatar"){
-    const filename = it.asset.split("/").pop();
-    localStorage.setItem("playerAvatar", filename);
-    const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) avatarEl.src=`assets/avatars/${filename}`;
+async function buyItem(id){
+  const it = SHOP_ITEMS.find(x=>x.id===id); if(!it) return;
+  const cost = it.cost || 0;
+
+  try {
+    const res = await fetch(`${apiBase}/inventory/buy`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: localStorage.getItem("playerName"), itemId: id, cost })
+    });
+    if (!res.ok) { const msg = await res.text(); alert(msg || "Purchase failed"); return; }
+    const data = await res.json();
+
+    localStorage.setItem("own_" + id, "1");
+    if (Number.isFinite(data.coins)) {
+      currentCoins = data.coins;
+      localStorage.setItem("playerCoins", String(currentCoins));
+      updateCoinsUI();
+    }
+    renderShopItems();
+
+    // auto-equip on first buy for cosmetics
+    const t = itemTypeFromIdClient(id);
+    if (t === "frame" || t === "trail" || t === "bg") equipItem(id);
+    if (t === "avatar") equipItem(id); // set avatar immediately
+  } catch {
+    alert("Network error buying item");
   }
-  renderShopItems();
+}
+
+async function equipItem(id){
+  const it = SHOP_ITEMS.find(x=>x.id===id); if(!it) return;
+  const t = itemTypeFromIdClient(id);
+  const payload = { username: localStorage.getItem("playerName"), itemId: id, type: t };
+
+  if (t === "avatar") {
+    const filename = (it.asset || "").split("/").pop();
+    payload.value = filename;
+  }
+
+  try {
+    const res = await fetch(`${apiBase}/inventory/equip`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) { const msg = await res.text(); alert(msg || "Equip failed"); return; }
+    const data = await res.json();
+
+    if (t === "frame") {
+      chosenFrame = id; localStorage.setItem("avatarFrame", id);
+      const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) applyAvatarFrame(avatarEl, id);
+    } else if (t === "trail") {
+      chosenTrail = id; localStorage.setItem("trailId", id); applyTrail(id);
+    } else if (t === "bg") {
+      chosenTheme = id; localStorage.setItem("themeId", id); applyTheme(id);
+    } else if (t === "avatar") {
+      const filename = (it.asset || "").split("/").pop();
+      localStorage.setItem("playerAvatar", filename);
+      const avatarEl=document.getElementById("avatarDisplay"); if(avatarEl) avatarEl.src=`assets/avatars/${filename}`;
+    }
+    renderShopItems();
+  } catch {
+    alert("Network error equipping item");
+  }
 }
 
 function activatePowerup(id){
-  const it=SHOP_ITEMS.find(x=>x.id===id && x.type==="powerup"); if(!it) return;
+  const it = SHOP_ITEMS.find(x=>x.id===id && x.type==="powerup"); if(!it) return;
   if (currentCoins < it.cost) { alert("Not enough coins"); return; }
   awardCoins(-it.cost);
-  boosterUntil = Date.now() + it.minutes*60*1000;
+  boosterUntil = Math.max(Date.now(), boosterUntil) + it.minutes*60*1000;
   localStorage.setItem("boosterUntil", String(boosterUntil));
   alert(`⚡ ${it.x}x coins active for ${it.minutes} minutes`);
   renderBoostPill();
 }
 
-/* Replaces your old applyAvatarFrame + adds trail/theme appliers */
+/* Cosmetics appliers */
 function applyAvatarFrame(imgEl, id){
   const item = SHOP_ITEMS.find(x=>x.id===id && x.type==="frame");
   if (!item){ imgEl.style.boxShadow=""; imgEl.style.borderColor=""; imgEl.style.borderWidth="2px"; return; }
@@ -550,47 +632,7 @@ function applyTheme(id){
   body.style.backgroundSize="cover"; body.style.backgroundPosition="center";
 }
 
-/* ======= AUDIO / EFFECTS ======= */
-const soundCorrect = new Audio("assets/sounds/correct.mp3");
-const soundWrong = new Audio("assets/sounds/wrong.mp3");
-const soundWin = new Audio("assets/sounds/win.mp3");
-const bgMusic = new Audio("assets/sounds/background.mp3");
-bgMusic.loop = true; bgMusic.volume = 0.4;
-
-let musicOn = true;
-function toggleMusic() { musicOn = !musicOn; musicOn ? bgMusic.play() : bgMusic.pause(); alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`); }
-function playWin(){ triggerConfetti(); }
-function floatCoin(text) {
-  const anchor = document.getElementById("coinDisplay");
-  const div = document.createElement("div");
-  div.className = "coin-float"; div.textContent = text;
-  document.body.appendChild(div);
-  const rect = anchor ? anchor.getBoundingClientRect() : { left: window.innerWidth/2, top: 20 };
-  div.style.left = rect.left + "px"; div.style.top = (rect.top - 8) + "px";
-  div.style.color = "#ffcd3c"; div.style.transform = "translateY(0)"; div.style.opacity = "1";
-  requestAnimationFrame(() => { div.style.transform = "translateY(-30px)"; div.style.opacity = "0"; });
-  setTimeout(() => div.remove(), 800);
-}
-function triggerConfetti() {
-  for (let i = 0; i < 20; i++) {
-    const s = document.createElement("div");
-    s.className = "sparkle";
-    s.style.left = `${Math.random() * 100}vw`;
-    s.style.top = `${Math.random() * 40 + 20}vh`;
-    s.style.background = "gold";
-    s.style.position = "fixed";
-    s.style.width = s.style.height = "6px";
-    s.style.borderRadius = "50%";
-    s.style.zIndex = "9999";
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 1000);
-  }
-}
-
-/* === COIN RAIN MINI-GAME === */
-const COIN_RAIN_DURATION_MS = 20000;
-
-// Preload sprite to avoid first-tap jank
+/* ======= COIN RAIN MINI-GAME (PNG) ======= */
 let _coinImgPreloaded = false;
 function preloadCoinImage() {
   if (_coinImgPreloaded) return;
@@ -599,10 +641,8 @@ function preloadCoinImage() {
   img.onload = () => { _coinImgPreloaded = true; };
 }
 
-// Ensure overlay exists once
 function ensureCoinRainDOM() {
   if (document.getElementById("coinRainOverlay")) return;
-
   const overlay = document.createElement("div");
   overlay.id = "coinRainOverlay";
   overlay.innerHTML = `
@@ -619,8 +659,13 @@ function ensureCoinRainDOM() {
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.querySelector("#crCloseBtn").addEventListener("click", endCoinRainEarly);
-  overlay.querySelector("#crDoneBtn").addEventListener("click", closeCoinRain);
+  document.getElementById('crCloseBtn')?.addEventListener('click', endCoinRainEarly);
+  document.getElementById('crDoneBtn')?.addEventListener('click', closeCoinRain);
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById("coinRainOverlay")?.style.display === "flex" && e.key === "Escape") {
+      if (crState) endCoinRainEarly(); else closeCoinRain();
+    }
+  });
 }
 
 let crState = null; // { start, timerId, spawnId, caught }
@@ -652,7 +697,7 @@ function startCoinRain() {
   crState.timerId = requestAnimationFrame(tick);
 
   function scheduleSpawn() {
-    const delay = 450 + Math.random() * 150; // 450–600ms
+    const delay = 450 + Math.random() * 150;
     crState.spawnId = setTimeout(() => { spawnCoin(playfield); scheduleSpawn(); }, delay);
   }
   scheduleSpawn();
@@ -665,7 +710,7 @@ function spawnCoin(containerEl) {
   coin.className = "cr-coin";
   coin.setAttribute("aria-label", "coin");
 
-  const maxX = Math.max(0, window.innerWidth - 56); // width from CSS
+  const maxX = Math.max(0, window.innerWidth - 56);
   const left = Math.floor(Math.random() * maxX);
   coin.style.left = left + "px";
   coin.style.setProperty("--fall-ms", (2200 + Math.random() * 1600) + "ms");
@@ -686,46 +731,24 @@ function collectCoin(coinEl) {
   setTimeout(() => coinEl.remove(), 180);
 }
 
-// --- PATCH 2: replace these two functions in the Coin Rain section ---
-
 function endCoinRain() {
   if (!crState) return;
 
-  // stop timers
   cancelAnimationFrame(crState.timerId);
   clearTimeout(crState.spawnId);
 
-  // disable playfield interactions and clear remaining coins (prevents blocking clicks)
   const playfield = document.getElementById("crPlayfield");
   if (playfield) {
     playfield.style.pointerEvents = "none";
     playfield.querySelectorAll(".cr-coin").forEach(n => n.remove());
   }
 
-  // show summary above everything
   const s = document.getElementById("crSummary");
   const txt = document.getElementById("crSummaryText");
   if (txt) txt.textContent = `You caught ${crState.caught} coin${crState.caught === 1 ? "" : "s"}!`;
   if (s) s.style.display = "block";
 
   crState = null;
-}
-
-function closeCoinRain() {
-  const overlay = document.getElementById("coinRainOverlay");
-  if (!overlay) return;
-
-  // reset playfield for next round
-  const playfield = document.getElementById("crPlayfield");
-  if (playfield) {
-    playfield.innerHTML = "";
-    playfield.style.pointerEvents = "auto";
-  }
-
-  const s = document.getElementById("crSummary");
-  if (s) s.style.display = "none";
-
-  overlay.style.display = "none";
 }
 
 function endCoinRainEarly() {
@@ -735,11 +758,69 @@ function endCoinRainEarly() {
 
 function closeCoinRain() {
   const overlay = document.getElementById("coinRainOverlay");
-  if (overlay) overlay.style.display = "none";
+  if (!overlay) return;
+
+  const playfield = document.getElementById("crPlayfield");
+  if (playfield) {
+    playfield.innerHTML = "";
+  }
+  const s = document.getElementById("crSummary");
+  if (s) s.style.display = "none";
+
+  overlay.style.display = "none";
+  if (playfield) playfield.style.pointerEvents = "auto";
+}
+
+/* ======= AUDIO / EFFECTS ======= */
+const soundCorrect = new Audio("assets/sounds/correct.mp3");
+const soundWrong = new Audio("assets/sounds/wrong.mp3");
+const soundWin = new Audio("assets/sounds/win.mp3");
+const bgMusic = new Audio("assets/sounds/background.mp3");
+bgMusic.loop = true; bgMusic.volume = 0.4;
+
+let musicOn = true;
+function toggleMusic() { musicOn = !musicOn; musicOn ? bgMusic.play() : bgMusic.pause(); alert(`Music ${musicOn ? 'On 🎵' : 'Off 🔇'}`); }
+function playWin(){ triggerConfetti(); }
+
+function floatCoin(text) {
+  const anchor = document.getElementById("coinDisplay");
+  const div = document.createElement("div");
+  div.className = "coin-float"; div.textContent = text;
+  document.body.appendChild(div);
+  const rect = anchor ? anchor.getBoundingClientRect() : { left: window.innerWidth/2, top: 20 };
+  div.style.left = rect.left + "px"; div.style.top = (rect.top - 8) + "px";
+  div.style.color = "#ffcd3c"; div.style.transform = "translateY(0)"; div.style.opacity = "1";
+  requestAnimationFrame(() => { div.style.transform = "translateY(-30px)"; div.style.opacity = "0"; });
+  setTimeout(() => div.remove(), 800);
+}
+
+function triggerConfetti() {
+  for (let i = 0; i < 20; i++) {
+    const s = document.createElement("div");
+    s.className = "sparkle";
+    s.style.left = `${Math.random() * 100}vw`;
+    s.style.top = `${Math.random() * 40 + 20}vh`;
+    s.style.background = "gold";
+    s.style.position = "fixed";
+    s.style.width = s.style.height = "6px";
+    s.style.borderRadius = "50%";
+    s.style.zIndex = "9999";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
 }
 
 /* ======= UTILS ======= */
 function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
+
+function itemTypeFromIdClient(itemId){
+  if (itemId.startsWith("frame-")) return "frame";
+  if (itemId.startsWith("trail-")) return "trail";
+  if (itemId.startsWith("bg-"))    return "bg";
+  if (itemId.startsWith("av-"))    return "avatar";
+  if (itemId.startsWith("boost-")) return "powerup";
+  return "unknown";
+}
 
 function logoutUser() {
   localStorage.removeItem("playerName");
@@ -752,6 +833,9 @@ function logoutUser() {
   localStorage.removeItem("xp");
   localStorage.removeItem("level");
   localStorage.removeItem("avatarFrame");
+  localStorage.removeItem("trailId");
+  localStorage.removeItem("themeId");
+  localStorage.removeItem("boosterUntil");
   localStorage.removeItem("dailyActive");
   window.location.href = "login.html";
 }
