@@ -789,7 +789,25 @@ function drawFinishFlags(){
   loadLevel(0);
   requestAnimationFrame(loop);
 })();
+
+	
+  function endGameAndReport(totalCoins) {
+    try {
+      // Send to opener (quickstart) – only if we have one
+      if (window.opener) {
+        window.opener.postMessage(
+          { type: "coincollect_result", coins: Number(totalCoins) || 0 },
+          window.location.origin // restrict to same-origin
+        );
+      }
+    } catch (e) { /* ignore */ }
+    // Optional: auto-close tab
+    window.close();
+  }
+  // call endGameAndReport(score) when your game finishes
+	
 </script>
 </body>
 </html>
+
 
