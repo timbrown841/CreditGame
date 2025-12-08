@@ -108,6 +108,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   preloadCoinImage?.(); // for Coin Rain PNG
 });
 
+// 👇 Add this block right here (after DOMContentLoaded)
+window.addEventListener("message", (e) => {
+  // Security: accept only same-origin
+  if (e.origin !== window.location.origin) return;
+
+  const msg = e.data || {};
+  if (msg.type === "coincollect_result") {
+    const gained = Number(msg.coins) || 0;
+    if (gained > 0) {
+      awardCoins(gained);        // updates UI + calls /reward-coins
+      floatCoin(`+${gained}`);   // small visual pop
+      alert(`🪙 Coin Collect bonus: +${gained} coins`);
+    }
+  }
+});
+
+
 /* ======= QUIZ BANKS ======= */
 const quizLevels = {
   easy: [
