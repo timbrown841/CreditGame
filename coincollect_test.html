@@ -1,0 +1,823 @@
+<!-- File: index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Credit Quest-Coin Collection Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <style>
+    html,body{margin:0;height:100%;background:#12131a;}
+    #game{display:block;margin:0 auto;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;}
+    .hud{position:fixed;left:0;right:0;top:8px;text-align:center;font:16px/1.2 ui-monospace,Menlo,monospace;color:#fff;text-shadow:0 2px 0 #000;pointer-events:none}
+    .top-right{position:fixed;right:10px;top:40px;display:flex;gap:8px}
+    .tiny{padding:8px 10px;border-radius:10px;background:#ffffff18;border:1px solid #ffffff30;color:#fff;font:12px ui-monospace,monospace}
+    .pill{position:fixed;right:10px;top:10px;padding:6px 10px;border-radius:999px;background:#ffffff18;border:1px solid #ffffff30;color:#fff;font:12px ui-monospace,monospace}
+    .banner{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;border-radius:14px;background:#000d;color:#fff;font:16px ui-monospace,monospace;border:1px solid #ffffff33;display:none;min-width:360px}
+    .banner.show{display:block}
+    .results{margin-top:8px;border-top:1px dashed #ffffff44;padding-top:8px}
+    .controls{position:fixed;inset:auto 0 0 0;display:flex;gap:10px;justify-content:space-between;padding:10px}
+    .btn{flex:0 0 auto;width:84px;height:84px;border-radius:22px;background:#ffffff22;backdrop-filter:blur(6px);border:1px solid #ffffff33;color:#fff}
+    .btn:active{background:#ffffff44}
+    .btn.jump{width:110px}
+    .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center}
+    .modal.show{display:flex}
+    .card{background:#0e1118;border:1px solid #2a2f3a;border-radius:14px;padding:16px;color:#fff;font:14px ui-monospace,monospace;min-width:360px}
+    .list button{display:block;width:100%;text-align:left;margin-top:6px;padding:8px;border-radius:10px;background:#ffffff10;border:1px solid #ffffff25;color:#fff}
+    .list button:hover{background:#ffffff18}
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Game canvas"></canvas>
+  <div class="hud" id="hud">LVL 1: Launchpad · TIME 0.0 · SCORE 000 · COINS 0 · LIVES 3 · SMALL · EARTH</div>
+  <div class="pill" id="hint">←/→ move, Z/Space (double jump), <b>X shoot</b>, P pause, R retry, M Moon, L Level Select</div>
+  <div class="top-right">
+    <button class="tiny" id="btnBiome" aria-label="Toggle Moon">🌕 Moon: OFF</button>
+    <button class="tiny" id="btnLevels" aria-label="Level Select">📜 Levels</button>
+  </div>
+
+  <!-- Results banner -->
+  <div class="banner" id="resultsBanner">
+    <div id="resultsTitle">LEVEL CLEAR!</div>
+    <div class="results" id="resultsBody"></div>
+    <div style="margin-top:8px;opacity:0.9">Enter: Next · R: Retry · L: Level Select</div>
+  </div>
+
+  <!-- Level select modal -->
+  <div class="modal" id="levelModal" aria-modal="true">
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:6px">Select Level</div>
+      <div class="list" id="levelList"></div>
+      <div style="margin-top:10px;opacity:0.8">Tip: Press number keys 1–9 to jump quickly.</div>
+    </div>
+  </div>
+
+  <!-- Touch controls -->
+  <div class="controls" aria-hidden="true">
+    <button class="btn" id="btnLeft" aria-label="Left">←</button>
+    <button class="btn" id="btnRight" aria-label="Right">→</button>
+    <div style="flex:1"></div>
+    <button class="btn jump" id="btnJump" aria-label="Jump">⎵</button>
+    <button class="btn" id="btnShoot" aria-label="Shoot">🔥</button>
+    <button class="btn" id="btnPause" aria-label="Pause">⏸</button>
+  </div>
+
+<script>
+/* Uses your astronaut.png as the avatar with 3-phase run animation and aspect-ratio preserving draw. */
+(() => {
+  // ---------- Physics & biome ----------
+  const TILE = 32;
+  let phys = { gravity:2100, jumpSmall:620, jumpBig:680, maxFall:1250 };
+  const MOVE_SPEED=220, AIR_ACCEL=1400, GROUND_ACCEL=3000, FRICTION=1800;
+  const GOOMBA_SPEED=60, MUSHROOM_SPEED=80, FIRE_SPEED=420, FIRE_CD=0.22, FIRE_MAX=3;
+  const VW=960, VH=540, STEP=1/60;   // virtual width/height (logic space)
+  const AVATAR_SCALE = 3.0;
+  const GOOMBA_SCALE = 3.0;   // increase to make the alien bigger
+
+  // Tiles
+  const SOLID = new Set(['X','B','R','Q','K','H','F','W']);
+  const ONE_WAY = new Set(['B','H']);
+
+  let biome = 'earth';
+  function setBiome(name){ biome=name;
+    if(name==='moon'){ phys.gravity=950; phys.jumpSmall=780; phys.jumpBig=820; phys.maxFall=800; }
+    else { phys.gravity=2100; phys.jumpSmall=620; phys.jumpBig=680; phys.maxFall=1250; }
+    btnBiome.textContent = `🌕 Moon: ${biome==='moon'?'ON':'OFF'}`;
+  }
+
+  // ---------- Canvas ----------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled=false;
+  
+  // --- Responsive canvas (DPR aware) ---
+let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0, DPR = Math.max(1, window.devicePixelRatio||1);
+
+function resizeCanvas(){
+  DPR = Math.max(1, window.devicePixelRatio||1);
+  const controlsH = 110; // space for on-screen buttons
+  const availW = Math.max(320, window.innerWidth);
+  const availH = Math.max(240, window.innerHeight - controlsH);
+  const scaleCss = Math.min(availW / VW, availH / VH);
+
+  const cssW = Math.round(VW * scaleCss);
+  const cssH = Math.round(VH * scaleCss);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+
+  canvas.width  = Math.round(cssW * DPR);
+  canvas.height = Math.round(cssH * DPR);
+
+  viewScale = canvas.width / VW;
+  viewOffsetX = 0;
+  viewOffsetY = 0;
+  ctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
+
+
+  // ---------- Load avatar image ----------
+  const avatarImg = new Image();
+  let avatarReady = false;
+  avatarImg.onload = () => { avatarReady = true; };
+  avatarImg.src = './astronaut.png'; // place next to index.html
+  // ---------- Load goomba (alien) image ----------
+  const goombaImg = new Image();
+  let goombaReady = false;
+  goombaImg.onload = () => { goombaReady = true; };
+  goombaImg.src = './alien.png'; // place next to index.html
+
+
+  // ---------- SFX ----------
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let actx=null; const ensureAudio=()=>{ if(!actx) actx=new AudioCtx(); };
+  function beep({freq=440,dur=0.12,type='square',a=0.005,d=0.03,s=0.5,r=0.08,vol=0.2}={}){ if(!actx) return;
+    const t0=actx.currentTime, t1=t0+a+d+r+0.02;
+    const o=actx.createOscillator(), g=actx.createGain(); o.type=type; o.frequency.setValueAtTime(freq,t0);
+    g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(vol,t0+a); g.gain.linearRampToValueAtTime(vol*s,t0+a+d); g.gain.linearRampToValueAtTime(0,t0+a+d+r);
+    o.connect(g).connect(actx.destination); o.start(t0); o.stop(t1);
+  }
+  const sfx={jumpSmall:()=>{ensureAudio();beep({freq:560,type:'square',dur:0.15});}, jumpBig:()=>{ensureAudio();beep({freq:480,type:'square',dur:0.18});},
+    coin:()=>{ensureAudio();beep({freq:900,type:'triangle',dur:0.08});}, stomp:()=>{ensureAudio();beep({freq:220,type:'sawtooth',dur:0.10});},
+    power:()=>{ensureAudio();beep({freq:520,type:'square',dur:0.20});}, break:()=>{ensureAudio();beep({freq:200,type:'sawtooth',dur:0.10});},
+    hurt:()=>{ensureAudio();beep({freq:120,type:'square',dur:0.25});}, clear:()=>{ensureAudio();beep({freq:880,type:'triangle',dur:0.5});},
+    jackpot:()=>{ensureAudio();beep({freq:1200,type:'triangle',dur:0.16});}, puff:()=>{ensureAudio();beep({freq:300,type:'triangle',dur:0.06,vol:0.15});},
+    shoot:()=>{ensureAudio();beep({freq:720,type:'square',dur:0.08});}, hit:()=>{ensureAudio();beep({freq:300,type:'sawtooth',dur:0.06});}
+  };
+
+  // ---------- Level data ----------
+  const LEVELS = [
+    { name:"Launchpad", biome:"earth", ascii:[
+"                                                                                                                    F           ",
+"                                                                                                                              XXX",
+"                                        C         B         C                 C                   K      W  C                  XXX",
+"                               B      XXXXX                XXX        B      XXX               XXXXX       XXXXX               XXX",
+"                                                                                                                                XX",
+"        P                                                                                                                     S XX",
+"XXXXXXXXXXXXXXXXXXXXXX           C        K   XXXXXXXX        C         XXXXXXXX          C              XXXXXXXX             XXXX",
+"                               XXXXX                        XXXXX      W  K       XXXXX           XXXXX                      XXXX",
+"                         G                                                                                                     XXX",
+"                 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX      XX",
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ]},
+    { name:"Cavern Run", biome:"earth", ascii:[
+"                                                                                                                                                                ",
+"                                                                                                                                                                ",
+"   K   Q    RRRR  W K    Q      RRR     Q          K          H                                                                                                 ",
+"                                                                                                                                                                ",
+"        P                                                                                                                                                S   F  ",
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     XXXXXXXXXXXXXXX      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ",
+"                                                                                                                                                                ",
+"                                                                                                                                                                ",
+"                                                                                                                                                                ",
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ]},
+    { name:"Moonbase", biome:"moon", ascii:[
+"                         C        C        C         C            C                 C             C         C             C                                      ",
+"                                                                                      C                     C                     C                              ",
+"      C          K   C   W   Q   C   K   C     Q     C   K     C   Q      C       K     C       F      C           C           C                              ",
+"          P        G                                                                          XXX         G            C          G                              ",
+"      C       G      C       C       C     C         C      C      C        C     C            C        C       C         C        C                        S  ",
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+"        C        C         C        C         C           C           C        C           C         C         C           C                                   ",
+"             G                 C            G          C       C            G            C       C            G           C         C                           ",
+"     C     C       C     C           C            C         C         C            C           C      C                 C         C                            ",
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ]},
+  ];
+
+  // ---------- UI refs ----------
+  const hud=document.getElementById('hud'), hint=document.getElementById('hint');
+  const resultsBanner=document.getElementById('resultsBanner');
+  const resultsBody=document.getElementById('resultsBody');
+  const btnBiome=document.getElementById('btnBiome');
+  const btnLevels=document.getElementById('btnLevels');
+  const levelModal=document.getElementById('levelModal');
+  const levelList=document.getElementById('levelList');
+
+  // ---------- Input ----------
+  const keys=new Set(); const btnState={left:false,right:false,jump:false,shoot:false}; let prevJump=false, prevShoot=false;
+  const norm=e=>e.key===' ' ? 'Space' : e.key;
+  window.addEventListener('keydown',e=>{
+    const k=norm(e); keys.add(k);
+    if(['Space','ArrowUp','z','Z','x','X'].includes(k)) e.preventDefault();
+    if(k==='m'||k==='M') toggleBiome();
+    if(k==='l'||k==='L') toggleLevelModal(true);
+    if(k>='1'&&k<='9' && levelModal.classList.contains('show')) { const i=Number(k)-1; if(i<LEVELS.length) selectLevel(i); }
+    if(k==='Enter' && resultsBanner.classList.contains('show')) nextLevel();
+  });
+  window.addEventListener('keyup',e=>{ keys.delete(norm(e)); });
+
+  // Touch
+  const btnLeft=document.getElementById('btnLeft'), btnRight=document.getElementById('btnRight'),
+        btnJump=document.getElementById('btnJump'), btnPause=document.getElementById('btnPause'),
+        btnShoot=document.getElementById('btnShoot');
+  bindHold(btnLeft, v=>btnState.left=v); bindHold(btnRight, v=>btnState.right=v); bindHold(btnJump, v=>btnState.jump=v, true);
+  bindHold(btnShoot, v=>btnState.shoot=v, true);
+  btnPause.addEventListener('click',()=>togglePause()); btnBiome.addEventListener('click',()=>toggleBiome()); btnLevels.addEventListener('click',()=>toggleLevelModal(true));
+  function bindHold(el,fn,prevent=false){ const start=e=>{fn(true); if(prevent) e.preventDefault();}; const end=()=>fn(false);
+    el.addEventListener('pointerdown',start); el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); el.addEventListener('pointerleave',end); }
+
+  // ---------- Entities / helpers ----------
+  const rect=(x,y,w,h)=>({x,y,w,h}); const overlap=(a,b)=>!(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
+  class Player{
+    constructor(spawn){ this.spawn={...spawn}; this.big=false; this.fire=false; this.MAX_JUMPS=2; this.reset(); }
+    reset(){ this.x=this.spawn.x; this.y=this.spawn.y; this.vx=0; this.vy=0; this.onGround=false; this.coyote=0; this.jumpBuf=0; this.w=24; this.h=28; this.face=1; this.dead=false; this.inv=0; this.riding=null; this.jumps=0; this.puff=0; this.walkT=0; this.wasOnGround=false; this.fireCd=0; }
+    sizeSync(){ const h=this.big?40:28; const dy=this.h-h; this.y+=dy; this.h=h; }
+    get r(){ return rect(this.x,this.y,this.w,this.h); }
+  }
+  class Goomba{ constructor(x,y){ this.x=x; this.y=y; this.w=28; this.h=20; this.vx=-GOOMBA_SPEED; this.vy=0; this.dead=false; this.sq=0; } get r(){return rect(this.x,this.y,this.w,this.h);} }
+  class Coin{ constructor(x,y){ this.x=x; this.y=y; this.w=16; this.h=16; this.t=0; this.taken=false; } get r(){return rect(this.x,this.y,this.w,this.h);} }
+  class Mushroom{ constructor(x,y){ this.x=x; this.y=y; this.w=20; this.h=20; this.vx=MUSHROOM_SPEED; this.vy=0; this.alive=true;} get r(){return rect(this.x,this.y,this.w,this.h);} }
+  class MovePlat{ constructor(x,y,ax=1,range=96,speed=50){ this.x=x; this.y=y; this.w=64; this.h=16; this.t=0; this.ax=ax; this.range=range; this.speed=speed; } get r(){return rect(this.x,this.y,this.w,this.h);} }
+  class Fireball{ constructor(x,y,dir){ this.x=x; this.y=y; this.w=10; this.h=10; this.vx=FIRE_SPEED*dir; this.vy=0; this.alive=true; this.life=1.5; } get r(){return rect(this.x,this.y,this.w,this.h);} }
+
+  // ---------- Global game state ----------
+  let LIDX=0, ASCII=[], H=0, W=0, at, isSolid, spawn={x:2*TILE,y:5*TILE};
+  let goombas=[], coins=[], qblocks=new Set(), checkpoints=[], plats=[], finishFlags=[], bricks=new Set();
+  let player=null, camera={x:0,y:0}, score=0, lives=3, paused=false, won=false, dust=[], mushrooms=[], fireballs=[];
+  let levelTime=0, levelScoreStart=0, levelCoinStart=0;
+
+  // Moonbase lower-belt info
+  let moonLowerIdx = -1;
+  let moonLowerGapRangesPx = [];
+
+  // ---------- Loader ----------
+  function loadLevel(i){
+    LIDX=i;
+    const def=LEVELS[LIDX];
+    ASCII=def.ascii.slice(); H=ASCII.length; W=ASCII[0].length;
+    at=(tx,ty)=> (tx>=0&&ty>=0&&tx<W&&ty<H) ? ASCII[ty][tx] : 'X';
+    isSolid=(tx,ty)=> SOLID.has(at(tx,ty));
+
+    if(def.biome) setBiome(def.biome);
+    if (def.name === "Moonbase") carveMoonbaseGaps();
+
+    goombas=[]; coins=[]; qblocks=new Set(); bricks=new Set(); checkpoints=[]; plats=[]; finishFlags=[]; dust=[]; fireballs=[]; mushrooms=[];
+    spawn={x:2*TILE,y:5*TILE};
+
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        const c=at(x,y);
+        if(c==='P') spawn={x:x*TILE,y:y*TILE-1};
+        if(c==='G') goombas.push(new Goomba(x*TILE,(y-1)*TILE));
+        if(c==='C') coins.push(new Coin(x*TILE+8,y*TILE+8));
+        if(c==='Q') qblocks.add(y*W+x);
+        if(c==='R') bricks.add(y*W+x);
+        if(c==='S') checkpoints.push({x:x*TILE,y:y*TILE-1});
+        if(c==='H') plats.push(new MovePlat(x*TILE,y*TILE+8,(x%2?1:-1)));
+        if(c==='F'){
+          // Snap flag to ground below its column
+          const wx = x*TILE+6;
+          let fy = y*TILE-20;
+          let groundTop = null;
+          for(let yy=y; yy<H; yy++){ if(isSolid(x,yy)){ groundTop = yy*TILE; break; } }
+          if(groundTop!=null){ fy = Math.max(8, groundTop - 60); } else { fy = Math.max(8, fy); }
+          finishFlags.push({x:wx, y:fy, w:20, h:60});
+        }
+      }
+    }
+
+    if (def.name === "Cavern Run") addCavernRunExtras();
+
+    player=new Player(spawn);
+    camera={x:0,y:0}; won=false; paused=false;
+    levelTime=0; levelScoreStart=score; levelCoinStart=totalCoins();
+    updateHud();
+    buildLevelList();
+    resultsBanner.classList.remove('show');
+  }
+
+  // Cavern Run extras (coins + goombas)
+  function addCavernRunExtras(){
+    const placeCoin = (tx,ty)=> coins.push(new Coin(tx*TILE+8, ty*TILE+8));
+    const placeGoomba = (tx,tyGlyphRow)=> goombas.push(new Goomba(tx*TILE, (tyGlyphRow-1)*TILE));
+    const goombaCols = [12, 22, 34, 46, 58, 72, 86, 100, 114, 128, 142, 156];
+    for(const c of goombaCols){ placeGoomba(c, 6); }
+    const coinSpreads = [
+      [6,0],[10,0],[14,0],[18,0],[22,0],[30,1],[34,1],[38,1],[42,1],
+      [52,2],[56,2],[60,2],[64,2],[68,2],
+      [78,3],[82,3],[86,3],[90,3],
+      [18,6],[26,6],[34,6],[40,6],[48,6],[54,6],[62,6],[70,6],[78,6],[86,6],[94,6],
+      [20,7],[28,7],[36,7],[44,7],[52,7],[60,7],[68,7],[76,7],[84,7],[92,7],
+      [24,8],[32,8],[40,8],[48,8],[56,8],[64,8],[72,8],[80,8],[88,8],[96,8],
+      [150,6],[154,6],[158,6]
+    ];
+    for(const [cx,cy] of coinSpreads){ placeCoin(cx,cy); }
+  }
+
+  // Create fall-through gaps in Moonbase long X rows
+  function carveMoonbaseGaps(){
+    const gapWidth = 5;
+    const gapColsTop  = [28, 60, 92, 124, 156];
+    const gapColsBottom = [16, 48, 88, 120, 148];
+
+    const xOnlyRowIdxs = [];
+    for(let y=0;y<H;y++){ if (/^X+$/.test(LEVELS[2].ascii[y])) xOnlyRowIdxs.push(y); }
+
+    const rows = xOnlyRowIdxs.slice(0, 2);
+    if (rows[0] != null){
+      ASCII[rows[0]] = carveGapsInRow(ASCII[rows[0]], gapColsTop, gapWidth);
+    }
+    moonLowerIdx = -1;
+    moonLowerGapRangesPx = [];
+    if (rows[1] != null){
+      ASCII[rows[1]] = carveGapsInRow(ASCII[rows[1]], gapColsBottom, gapWidth);
+      moonLowerIdx = rows[1];
+      for(const c of gapColsBottom){
+        const x0 = c * TILE;
+        const x1 = (c + gapWidth) * TILE;
+        moonLowerGapRangesPx.push({x0, x1});
+      }
+    }
+  }
+  function carveGapsInRow(row, cols, width){
+    let s=row;
+    for(const c of cols){
+      for(let k=0;k<width;k++){
+        const idx=c+k; if(idx>=0 && idx<s.length){ s = s.substring(0, idx) + ' ' + s.substring(idx+1); }
+      }
+    }
+    return s;
+  }
+
+  // ---------- Level select UI ----------
+  function buildLevelList(){
+    levelList.innerHTML='';
+    LEVELS.forEach((lv,idx)=>{
+      const b=document.createElement('button');
+      b.textContent=`${idx+1}. ${lv.name} ${idx===LIDX?'(current)':''}`;
+      b.addEventListener('click',()=>{ selectLevel(idx); });
+      levelList.appendChild(b);
+    });
+  }
+  function toggleLevelModal(show){ levelModal.classList.toggle('show', !!show); }
+  function selectLevel(idx){ toggleLevelModal(false); loadLevel(idx); }
+
+  // ---------- Collision helpers ----------
+  const tilesOverlapping=(r)=>{ const tx0=Math.floor(r.x/TILE)-1, tx1=Math.floor((r.x+r.w)/TILE)+1, ty0=Math.floor(r.y/TILE)-1, ty1=Math.floor((r.y+r.h)/TILE)+1, out=[];
+    for(let ty=ty0;ty<=ty1;ty++){ for(let tx=tx0;tx<=tx1;tx++){ const c=at(tx,ty); if(SOLID.has(c)) out.push({tx,ty,c,rr:rect(tx*TILE,ty*TILE,TILE,TILE)}); } } return out; };
+
+  function moveEntity(e, vx, vy, isP=false){
+    e.x+=vx; let r=e.r;
+    for(const t of tilesOverlapping(r)){
+      if(!overlap(r,t.rr)) continue; if(ONE_WAY.has(t.c)) continue;
+      if(vx>0) e.x=t.rr.x-e.w; else if(vx<0) e.x=t.rr.x+t.rr.w; r=e.r;
+    }
+    e.y+=vy; e.onGround=false; r=e.r;
+    for(const t of tilesOverlapping(r)){
+      if(!overlap(r,t.rr)) continue;
+      if(ONE_WAY.has(t.c) && (r.y+r.h)-t.rr.y<=16 && vy>=0 && (r.y+r.h)<=t.rr.y+20){ e.y=t.rr.y-e.h; e.vy=0; e.onGround=true; continue; }
+      if(ONE_WAY.has(t.c)) continue;
+      if(vy>0){ e.y=t.rr.y-e.h; e.vy=0; e.onGround=true; if(isP){ e.jumps=0; if(!player.wasOnGround) spawnDust(e.x+e.w/2, e.y+e.h, 6);} }
+      else if(vy<0){ e.y=t.rr.y+t.rr.h; e.vy=0; if(isP) headHitHandler(t.tx,t.ty,t.c); }
+      r=e.r;
+    }
+  }
+
+  function headHitHandler(tx,ty,c){
+    const key=ty*W+tx;
+    if(c==='R'){ if(player.big){ bricks.delete(key); score+=50; sfx.break(); popup(tx*TILE+4, ty*TILE-6, "+50"); ASCII[ty]=replaceAt(ASCII[ty],tx,' ');} }
+    else if(c==='Q'){
+      const mush=Math.random()<0.2 && !player.big;
+      if(mush){ mushrooms.push(new Mushroom(tx*TILE+6,(ty-1)*TILE+4)); sfx.power(); }
+      else { addCoin(1); score+=100; sfx.coin(); popup(tx*TILE+8,(ty-1)*TILE,"+100"); }
+      qblocks.delete(key); ASCII[ty]=replaceAt(ASCII[ty],tx,'b');
+    } else if(c==='K'){
+      addCoin(5); score+=500; sfx.jackpot(); sfx.break(); popup(tx*TILE+6,(ty-1)*TILE,"+5 COINS"); ASCII[ty]=replaceAt(ASCII[ty],tx,' ');
+    } else if(c==='W'){
+      player.fire = true; sfx.power(); popup(tx*TILE+6,(ty-1)*TILE,"FIRE!");
+      ASCII[ty]=replaceAt(ASCII[ty],tx,'b');
+    }
+  }
+  const replaceAt=(s,i,ch)=>s.substring(0,i)+ch+s.substring(i+1);
+
+  // ---------- Loop ----------
+  let last=performance.now(), acc=0;
+  function loop(now){
+    const dt=Math.min(0.05,(now-last)/1000); last=now;
+    if(!paused){ acc+=dt; while(acc>=STEP){ update(STEP); acc-=STEP; } }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Update ----------
+  function update(dt){
+    const left=keys.has('ArrowLeft')||keys.has('a')||btnState.left;
+    const right=keys.has('ArrowRight')||keys.has('d')||btnState.right;
+    const jump=keys.has('z')||keys.has('Z')||keys.has(' ')||keys.has('Space')||keys.has('ArrowUp')||keys.has('w')||btnState.jump;
+    const shoot=keys.has('x')||keys.has('X')||btnState.shoot;
+    const justJump=jump && !prevJump; prevJump=jump; if(justJump) player.jumpBuf=0.10;
+    const justShoot = shoot && !prevShoot; prevShoot = shoot;
+
+    if(keys.has('p')||keys.has('P')){ keys.delete('p'); keys.delete('P'); togglePause(); }
+    if(keys.has('r')||keys.has('R')){ keys.delete('r'); keys.delete('R'); retryLevel(); }
+
+    if(won){ player.vx=0; player.vy=0; return; }
+    if(player.dead){ player.inv-=dt; if(player.inv<=0) respawn(); return; }
+
+    levelTime += dt;
+    player.fireCd = Math.max(0, player.fireCd - dt);
+
+    const COYOTE=0.08;
+    player.coyote = player.onGround ? COYOTE : Math.max(0, player.coyote-dt);
+    player.jumpBuf = Math.max(0, player.jumpBuf-dt);
+    player.inv = Math.max(0, player.inv-dt);
+    player.puff = Math.max(0, player.puff-dt);
+
+    const accel = player.onGround ? GROUND_ACCEL : AIR_ACCEL;
+    if(left ^ right){
+      const dir = left ? -1 : 1; player.vx += dir*accel*dt; player.vx=clamp(player.vx,-MOVE_SPEED,MOVE_SPEED); player.face=dir;
+      if(player.onGround && Math.random()<0.25*(biome==='moon'?1.4:1.0)) spawnDust(player.x+(dir>0?player.w:0), player.y+player.h, 1);
+    } else {
+      const f=Math.min(Math.abs(player.vx),FRICTION*dt)*Math.sign(player.vx); player.vx-=f;
+    }
+
+    if(player.jumpBuf>0){
+      if((player.onGround||player.coyote>0||player.riding) && player.jumps===0) doJump(false);
+      else if(player.jumps<player.MAX_JUMPS && !player.onGround) doJump(true);
+    }
+
+    // Shooting
+    if(player.fire && justShoot && player.fireCd<=0 && fireballs.length < FIRE_MAX){
+      const dir = player.face>0 ? 1 : -1;
+      const fx = player.x + (dir>0 ? player.w : -10);
+      const fy = player.y + player.h*0.35;
+      fireballs.push(new Fireball(fx, fy, dir));
+      player.fireCd = FIRE_CD; sfx.shoot();
+    }
+
+    // Gravity & motion
+    player.vy = Math.min(phys.maxFall, player.vy + phys.gravity*dt);
+    player.wasOnGround = player.onGround; player.onGround=false; player.riding=null;
+    for(const p of plats){ p.t+=dt; p.x = p.x + Math.sin(p.t*(p.speed/20)*0.5)*p.ax; }
+    moveEntity(player, player.vx*dt, player.vy*dt, true);
+
+    for(const p of plats){
+      const r=p.r;
+      if(player.vy>=0 && (player.y+player.h)<=r.y+18){
+        const feet=rect(player.x, player.y+player.h, player.w, 4);
+        if(overlap(feet,r)){ player.y=r.y-player.h; player.vy=0; player.onGround=true; player.riding=p; player.jumps=0; }
+      }
+      const head=rect(player.x, player.y-4, player.w, 4);
+      if(overlap(head, r) && player.vy<0){ player.y=r.y+r.h; player.vy=0; }
+    }
+
+    if(player.onGround && Math.abs(player.vx)>10) player.walkT += Math.abs(player.vx)*dt*0.06; else player.walkT += dt*0.6;
+
+    // Coins idle
+    for(const c of coins){ if(!c.taken) c.t+=dt*5; }
+
+    // Mushrooms
+    for(const m of mushrooms){
+      if(!m.alive) continue; m.vy=Math.min(phys.maxFall, m.vy+phys.gravity*dt);
+      const aheadX=m.x+(m.vx>0?m.w+1:-1), footY=m.y+m.h+1, tx=Math.floor(aheadX/TILE), ty=Math.floor((m.y+m.h/2)/TILE), tyF=Math.floor(footY/TILE);
+      if(isSolid(tx,ty) || !isSolid(tx,tyF)) m.vx=-m.vx; moveEntity(m,m.vx*dt,m.vy*dt);
+      if(overlap(player.r,m.r)){ m.alive=false; player.big=true; player.sizeSync(); score+=500; sfx.power(); popup(player.x,player.y-14,"POWER UP!"); }
+    }
+
+    // Goombas
+    for(const g of goombas){
+      if(g.dead){ g.sq+=dt; continue; }
+      g.vy = Math.min(phys.maxFall, g.vy+phys.gravity*dt);
+      const aheadX=g.x+(g.vx>0?g.w+1:-1), footY=g.y+g.h+1, tx=Math.floor(aheadX/TILE), ty=Math.floor((g.y+g.h/2)/TILE), tyF=Math.floor(footY/TILE);
+      if(isSolid(tx,ty) || !isSolid(tx,tyF)) g.vx=-g.vx; moveEntity(g,g.vx*dt,g.vy*dt);
+    }
+    for(let i=goombas.length-1;i>=0;i--){
+      const g=goombas[i];
+      if(g.dead && g.sq>0.6){ goombas.splice(i,1); continue; }
+      if(!g.dead && overlap(player.r,g.r)){
+        const pv=player.vy, top=(player.y+player.h)-g.y;
+        if(pv>0 && top<16){ g.dead=true; score+=200; player.vy=-(player.big?phys.jumpBig:phys.jumpSmall)*0.6; sfx.stomp(); popup(g.x,g.y-10,"+200"); }
+        else if(player.inv<=0){
+          if(player.big){ player.big=false; player.fire=false; player.sizeSync(); player.inv=1.0; sfx.hurt(); popup(player.x,player.y-14,"SHRINK!"); }
+          else { hurt(true); }
+        }
+      }
+    }
+
+    // Moonbase gap respawn
+    if (LEVELS[LIDX].name === "Moonbase" && moonLowerIdx >= 0 && moonLowerGapRangesPx.length){
+      const thresholdY = (moonLowerIdx + 1) * TILE;
+      if (player.y >= thresholdY){
+        const px = player.x + player.w/2;
+        for (const r of moonLowerGapRangesPx){
+          if (px >= r.x0 && px < r.x1){ hurt(true); break; }
+        }
+      }
+    }
+
+    // Bottom-out
+    if(player.y>H*TILE+80) hurt(true);
+
+    // Fireballs update & collisions
+    for(let i=fireballs.length-1;i>=0;i--){
+      const f=fireballs[i]; f.life -= dt; if(f.life<=0){ fireballs.splice(i,1); continue; }
+      f.x += f.vx*dt;
+      const r=f.r;
+      let hitSomething=false;
+      for(const g of goombas){
+        if(!g.dead && overlap(r, g.r)){
+          g.dead=true; g.sq=0; score+=200; sfx.hit(); popup(g.x,g.y-10,"+200"); hitSomething=true; break;
+        }
+      }
+      if(hitSomething){ fireballs.splice(i,1); continue; }
+      const tx0=Math.floor(f.x/TILE), ty0=Math.floor(f.y/TILE);
+      if(isSolid(tx0,ty0)){
+        const c=at(tx0,ty0);
+        if(c==='K'){ addCoin(5); score+=500; sfx.jackpot(); sfx.break(); popup(tx0*TILE+6,(ty0-1)*TILE,"+5 COINS"); ASCII[ty0]=replaceAt(ASCII[ty0],tx0,' '); }
+        else if(c==='R'){ score+=50; sfx.break(); popup(tx0*TILE+4, ty0*TILE-6, "+50"); ASCII[ty0]=replaceAt(ASCII[ty0],tx0,' '); }
+        sfx.hit(); fireballs.splice(i,1); continue;
+      }
+      if(f.x<-40 || f.x>W*TILE+40){ fireballs.splice(i,1); }
+    }
+
+    // Coin pickups
+    for(const c of coins){ if(!c.taken && overlap(player.r,c.r)){ c.taken=true; addCoin(1); score+=100; sfx.coin(); popup(c.x,c.y-10,"+100"); } }
+    // Checkpoints
+    for(const cp of checkpoints){ if(overlap(player.r, rect(cp.x,cp.y,24,32))){ player.spawn={...cp}; } }
+    // Finish
+    for(const f of finishFlags){ if(overlap(player.r, rect(f.x,f.y,f.w,f.h))){ won=true; sfx.clear(); showResults(); } }
+
+    // Dust
+    for(let i=dust.length-1;i>=0;i--){ const p=dust[i]; p.t+=dt; p.vy+=phys.gravity*0.3*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; if(p.t>p.life) dust.splice(i,1); }
+
+	const target=clamp(player.x+player.w/2-VW/2,0,W*TILE-VW);
+
+    updateHud();
+  }
+
+  // ---------- Results ----------
+  function showResults(){
+    const def=LEVELS[LIDX];
+    const coinsNow=totalCoins(), coinsDelta=coinsNow-levelCoinStart;
+    const scoreDelta=score-levelScoreStart;
+    const t=levelTime, grade = t<20?'S': t<35?'A': t<55?'B':'C';
+    resultsBody.innerHTML = `
+      <div><b>${escapeHtml(def.name)}</b> — Time: ${t.toFixed(1)}s, Grade: <b>${grade}</b></div>
+      <div>Coins: +${coinsDelta} · Score: +${scoreDelta}</div>
+      <div style="margin-top:6px">Press <b>Enter</b> for Next, <b>R</b> to Retry, <b>L</b> to pick a level.</div>
+    `;
+    document.getElementById('resultsTitle').textContent = (LIDX===LEVELS.length-1) ? "GAME COMPLETE!" : "LEVEL CLEAR!";
+    resultsBanner.classList.add('show');
+  }
+
+  function nextLevel(){ if(LIDX < LEVELS.length-1){ loadLevel(LIDX+1); } else { loadLevel(0); } }
+  function retryLevel(){ loadLevel(LIDX); }
+
+  // ---------- Actions ----------
+  function doJump(double){
+    const imp=player.big?phys.jumpBig:phys.jumpSmall; player.vy=-imp; player.coyote=0; player.jumpBuf=0; player.riding=null; player.jumps+=1;
+    if(player.jumps===1){ player.onGround=false; (player.big?sfx.jumpBig:sfx.jumpSmall)(); }
+    else { beep({freq:player.big?520:580,type:'square',dur:0.12}); sfx.puff(); player.puff=0.12; spawnDust(player.x+player.w/2, player.y+player.h, 4); }
+  }
+  function hurt(fell=false){
+    lives-=1; if(lives<=0){ lives=3; score=0; } player.dead=true; player.fire=false; player.inv=0.8; sfx.hurt(); popup(player.x,player.y-12,fell?"OOPS!":"OUCH!");
+  }
+  function respawn(){ player=new Player(player.spawn); }
+
+  // ---------- Coins & utils ----------
+  function totalCoins(){ return coins.filter(c=>c.taken).length; }
+  function addCoin(n){ for(let i=0;i<n;i++){} }
+  function popup(x,y,msg){ popups.push({x,y,msg,t:0}); }
+  const popups=[];
+  function spawnDust(x,y,amount){ const n=amount+(biome==='moon'?4:0);
+    for(let i=0;i<n;i++){ const ang=Math.random()*Math.PI+Math.PI, spd=(biome==='moon'?40:70)*(0.4+Math.random()*0.8);
+      dust.push({x,y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd*(biome==='moon'?0.5:1), t:0, life:0.6+Math.random()*0.4, r:2+Math.random()*2});
+    }
+  }
+  const clamp=(v,min,max)=>v<min?min:v>max?max:v;
+
+  // ---------- Rendering ----------
+  function draw(){
+	ctx.setTransform(viewScale,0,0,viewScale,viewOffsetX,viewOffsetY); // scale world→pixels
+	drawSky();
+    ctx.save(); ctx.translate(-camera.x*0.35,0); drawBackgroundLayer(); ctx.restore();
+
+    ctx.save(); ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+    drawTiles(); drawPlatforms(); drawFinishFlags(); drawCoins(); drawMushrooms(); drawGoombas(); drawDust(); drawFireballs(); drawPlayer(); drawPopups();
+    ctx.restore();
+
+	ctx.fillStyle= biome==='moon' ? '#4c4c4c' : '#2b2b2b'; ctx.fillRect(0,VH-8,VW,8);
+  }
+
+  function drawSky(){
+	if(biome==='moon'){ ctx.fillStyle='#0b0e18'; ctx.fillRect(0,0,VW,VH);
+      for(let i=0;i<60;i++){ const sx=(i*157+(performance.now()/50|0))%CANVAS_W, sy=(i*97)%CANVAS_H; ctx.fillStyle=i%7===0?'#a6c8ff':'#ffffff'; ctx.fillRect(sx,sy,2,2); }
+	} else { ctx.fillStyle='#6ad0ff'; ctx.fillRect(0,0,VW,VH); }
+  }
+  function drawBackgroundLayer(){
+	if(biome==='moon'){ ctx.fillStyle='#6a6a6a'; const baseY=VH-80;
+      for(let i=-1;i<10;i++){ const x=i*220+(Math.sin(i)*40);
+        ctx.beginPath(); ctx.ellipse(x+110, baseY, 90, 18, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#5a5a5a'; ctx.beginPath(); ctx.ellipse(x+110, baseY+10, 60, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#6a6a6a';
+      }
+	} else { ctx.fillStyle='#9be370'; const baseY=VH-64;
+      for(let i=-1;i<12;i++){ const x=i*220+(Math.sin(i)*40);
+        ctx.beginPath(); ctx.moveTo(x,baseY); ctx.quadraticCurveTo(x+110,baseY-80,x+220,baseY); ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  
+  function drawTiles(){
+  for(let y=0;y<H;y++){ for(let x=0;x<W;x++){
+    const c=at(x,y); if(!SOLID.has(c) && c!=='b') continue; const wx=x*TILE, wy=y*TILE;
+    if(c==='X'){ // solid block
+      ctx.fillStyle= biome==='moon' ? '#7b7b7b' : '#b44'; ctx.fillRect(wx,wy,TILE,TILE);
+      const s=biome==='moon'?'#636363':'#933'; ctx.fillStyle=s;
+      ctx.fillRect(wx,wy+TILE-6,TILE,6); ctx.fillRect(wx+TILE-6,wy,6,TILE);
+    } else if(c==='B'){ // one-way
+      ctx.fillStyle= biome==='moon' ? '#9c9c9c' : '#d9a066'; ctx.fillRect(wx,wy,TILE,TILE);
+      ctx.fillStyle= biome==='moon' ? '#6e6e6e' : '#8f563b'; ctx.fillRect(wx,wy+TILE-5,TILE,5);
+    } else if(c==='R'){ // brick
+      ctx.fillStyle='#b66'; ctx.fillRect(wx,wy,TILE,TILE);
+      ctx.fillStyle='#844'; ctx.strokeStyle='#733'; ctx.strokeRect(wx+4,wy+4,TILE-8,TILE-8);
+    } else if(c==='Q' || c==='b'){ // question / spent
+      ctx.fillStyle=(c==='Q')?'#ffd966':'#aaa'; ctx.fillRect(wx,wy,TILE,TILE);
+      if(c==='Q'){
+        ctx.fillStyle='#b38f2c'; ctx.fillRect(wx+12,wy+8,8,4); ctx.fillRect(wx+12,wy+16,8,4);
+      } else {
+        ctx.fillStyle='#777'; ctx.fillRect(wx,wy+TILE-5,TILE,5);
+      }
+    } else if(c==='K'){ // crate
+      ctx.fillStyle='#d78b3f'; ctx.fillRect(wx,wy,TILE,TILE); ctx.strokeStyle='#8f563b'; ctx.lineWidth=2;
+      ctx.strokeRect(wx+3,wy+3,TILE-6,TILE-6);
+      ctx.beginPath(); ctx.moveTo(wx+6,wy+6); ctx.lineTo(wx+TILE-6,wy+TILE-6);
+      ctx.moveTo(wx+TILE-6,wy+6); ctx.lineTo(wx+6,wy+TILE-6); ctx.stroke();
+    } else if(c==='W'){ // weapon box
+      ctx.fillStyle='#ffb347'; ctx.fillRect(wx,wy,TILE,TILE);
+      ctx.fillStyle='#ff6a00'; ctx.fillRect(wx+6,wy+6,20,20);
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(wx+16,wy+16,6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff6a00'; ctx.beginPath(); ctx.arc(wx+16,wy+16,4,0,Math.PI*2); ctx.fill();
+    } else if(c==='F'){ /* flag base is drawn in drawFinishFlags() */ }
+  } }
+}
+
+function drawPlatforms(){
+  ctx.fillStyle=biome==='moon'?'#9c9c9c':'#d9a066';
+  for(const p of plats){
+    ctx.fillRect(p.x,p.y,p.w,p.h);
+    ctx.fillStyle=biome==='moon'?'#6e6e6e':'#8f563b';
+    ctx.fillRect(p.x,p.y+p.h-4,p.w,4);
+    ctx.fillStyle=biome==='moon'?'#9c9c9c':'#d9a066';
+  }
+}
+
+function drawFinishFlags(){
+  for(const f of finishFlags){
+    ctx.fillStyle='#dddddd'; ctx.fillRect(f.x,f.y,6,f.h);
+    ctx.fillStyle= biome==='moon' ? '#c1a6ff' : '#3ad15b';
+    ctx.beginPath(); ctx.moveTo(f.x+6,f.y+8); ctx.lineTo(f.x+28,f.y+16); ctx.lineTo(f.x+6,f.y+24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#888'; ctx.fillRect(f.x-4,f.y+f.h-6,16,6);
+  }
+}
+
+
+  // ---------- Player (PNG) ----------
+  function drawPlayer(){
+    const p=player;
+    const airborneBob = p.onGround ? 0 : Math.sin(performance.now()/120)*1.5;
+
+    if (avatarReady){
+      // run-cycle phase → 3 frames
+      const speedRatio = Math.min(1, Math.abs(p.vx)/MOVE_SPEED);
+      const cycle = p.walkT * (p.onGround ? 1 : 0.6);
+      const phase = (cycle*2*Math.PI) % (2*Math.PI);
+      const frame = Math.floor((phase/(2*Math.PI))*3) % 3; // 0,1,2
+
+      // subtle tilt & per-frame bob when moving on ground
+      let tiltDeg = 0, frameBob = 0;
+      if (p.onGround && speedRatio > 0.15){
+        tiltDeg = (frame===0? -6 : frame===1? 0 : 6) * speedRatio; // why: readable 3-phase wobble
+        frameBob = (frame===1? -2 : 0) * speedRatio;
+      }
+
+      // collision-box target area
+      const targetW = p.w, targetH = p.h;
+      const imgW = avatarImg.naturalWidth || 64, imgH = avatarImg.naturalHeight || 64;
+
+      // preserve aspect ratio and center
+      const baseScale = Math.min(targetW/imgW, targetH/imgH);
+	  const scale = baseScale * AVATAR_SCALE;
+	  const drawW = imgW * scale, drawH = imgH * scale;
+	  const padX = (targetW - drawW) / 2;
+	  const padY = (targetH - drawH); // bottom-align feet
+
+
+      // flip when facing left; rotate around center for tilt
+      ctx.save();
+      const baseX = p.x + (p.face>0 ? 0 : targetW);
+      const baseY = p.y + airborneBob + frameBob;
+      ctx.translate(baseX, baseY);
+      ctx.scale(p.face>0 ? 1 : -1, 1);
+
+      // rotate around sprite center
+      ctx.translate(padX + drawW/2, padY + drawH/2);
+      ctx.rotate(tiltDeg * Math.PI/180);
+      ctx.translate(- (padX + drawW/2), - (padY + drawH/2));
+
+      ctx.drawImage(avatarImg, padX, padY, drawW, drawH);
+
+      // fire badge
+      if(p.fire){
+        ctx.fillStyle='#ff6a00'; ctx.fillRect(targetW-6, 2, 4, 6);
+        ctx.fillStyle='#fff'; ctx.fillRect(targetW-5, 3, 2, 2);
+      }
+      ctx.restore();
+      return;
+    }
+
+    // Fallback vector astronaut
+    const headY=p.y-(p.big?10:6)+airborneBob;
+    if(p.puff>0){ const a=Math.min(1,p.puff/0.12); ctx.globalAlpha=a; ctx.fillStyle=biome==='moon'?'#c8d8ff':'#9ad0ff';
+      const packW=6, packH=14, packX=p.face>0?p.x-packW+1:p.x+p.w-1, packY=p.y+6+airborneBob+packH-2, puffX=p.face>0?(packX+packW):(packX-6);
+      ctx.beginPath(); ctx.ellipse(puffX, packY, 6, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
+    const speed=Math.min(1,Math.abs(p.vx)/MOVE_SPEED), phaseVec=p.walkT*(p.onGround?1:0.6), legSwing=Math.sin(phaseVec*2*Math.PI)*6*speed, armSwing=Math.sin(phaseVec*2*Math.PI)*7*speed;
+    ctx.fillStyle=p.dead?'#777':'#f5f7fa'; ctx.fillRect(p.x,p.y+airborneBob,p.w,p.h);
+    ctx.fillStyle='#d9dee6'; ctx.fillRect(p.x+3, p.y+p.h-16+airborneBob + (p.onGround?(p.face>0?-legSwing:legSwing)/2:0), 6,14);
+    ctx.fillRect(p.x+p.w-9, p.y+p.h-16+airborneBob - (p.onGround?(p.face>0?-legSwing:legSwing)/2:0), 6,14);
+    ctx.fillStyle='#39424e'; ctx.fillRect(p.x+2,p.y+p.h-4+airborneBob,8,4); ctx.fillRect(p.x+p.w-10,p.y+p.h-4+airborneBob,8,4);
+    ctx.fillStyle='#e5eaf0'; ctx.fillRect(p.x+2, p.y+8+airborneBob + (p.onGround?(p.face>0?-armSwing:armSwing)/2:-2), 5,12);
+    ctx.fillRect(p.x+p.w-7, p.y+8+airborneBob - (p.onGround?(p.face>0?-armSwing:armSwing)/2:-2), 5,12);
+    ctx.fillStyle='#bfc7cf'; const packW=6, packH=14, packX=p.face>0?p.x-packW+1:p.x+p.w-1, packY=p.y+6+airborneBob; ctx.fillRect(packX,packY,packW,packH);
+    const helmetH=p.big?18:14, helmetW=p.w; ctx.fillStyle='#e8edf3'; ctx.fillRect(p.x,headY,helmetW,helmetH);
+    ctx.fillStyle='#3a7bd5'; const pad=4; ctx.fillRect(p.x+pad, headY+4, helmetW-pad*2, helmetH-8);
+    ctx.fillStyle='#a6c8ff'; const eyeX=p.face>0?p.x+p.w-8:p.x+4; ctx.fillRect(eyeX, headY+7, 3, 3);
+    if(p.big){ ctx.fillStyle='#d39a44'; ctx.fillRect(p.x, p.y+p.h*0.55 + airborneBob, p.w, 3); }
+    if(p.fire){ ctx.fillStyle='#ff6a00'; ctx.fillRect(p.x+p.w-6, p.y+airborneBob+2, 4, 6); ctx.fillStyle='#fff'; ctx.fillRect(p.x+p.w-5, p.y+airborneBob+3, 2, 2); }
+  }
+
+
+	// draw Goombas (now aliens)
+  function drawGoombas(){
+  for (const g of goombas) {
+    if (g.dead) {
+      const h = Math.max(6, Math.round(g.h * 0.4));
+      const y = g.y + (g.h - h);
+      if (goombaReady) {
+        const iw = goombaImg.naturalWidth || 64, ih = goombaImg.naturalHeight || 64;
+        const s  = Math.min(g.w/iw, h/ih) * GOOMBA_SCALE;
+        const dw = iw*s, dh = ih*s;
+        const dx = g.x + (g.w - dw)/2;
+        const dy = y   + (h   - dh);
+        ctx.drawImage(goombaImg, dx, dy, dw, dh);
+      } else {
+        ctx.fillStyle='#442211';
+        ctx.fillRect(g.x, y, g.w, h);
+      }
+      continue;
+    }
+
+    if (goombaReady) {
+      const iw = goombaImg.naturalWidth || 64, ih = goombaImg.naturalHeight || 64;
+      const s  = Math.min(g.w/iw, g.h/ih) * GOOMBA_SCALE; // ← bigger alien here
+      const dw = iw*s, dh = ih*s;
+      const dx = g.x + (g.w - dw)/2;
+      const dy = g.y + (g.h - dh);
+      ctx.drawImage(goombaImg, dx, dy, dw, dh);
+    } else {
+      ctx.fillStyle='#aa7744'; ctx.fillRect(g.x,g.y,g.w,g.h);
+      ctx.fillStyle='#442211';
+      ctx.fillRect(g.x+4,g.y+g.h-6,8,6);
+      ctx.fillRect(g.x+g.w-12,g.y+g.h-6,8,6);
+    }
+  }
+}
+  function drawCoins(){ for(const c of coins){ if(c.taken) continue; const y=c.y+Math.sin(c.t)*3; ctx.fillStyle='#ffd966'; ctx.beginPath(); ctx.ellipse(c.x,y,6,8,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#b38f2c'; ctx.fillRect(c.x-1,y-6,2,12); } }
+  function drawMushrooms(){ for(const m of mushrooms){ if(!m.alive) continue; ctx.fillStyle='#d04a4a'; ctx.fillRect(m.x,m.y,m.w,m.h); ctx.fillStyle='#fff'; ctx.fillRect(m.x+4,m.y+4,4,4); ctx.fillRect(m.x+m.w-8,m.y+4,4,4); } }
+  function drawDust(){ for(const p of dust){ const a=1-(p.t/p.life); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=biome==='moon'?'#cfcfcf':'#ffffff'; ctx.beginPath(); ctx.ellipse(p.x,p.y,p.r,p.r*0.7,0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; } }
+  function drawFireballs(){
+    for(const f of fireballs){
+      ctx.fillStyle = '#ffdc7a'; ctx.beginPath(); ctx.ellipse(f.x+f.w/2, f.y+f.h/2, 6, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ff6a00'; ctx.beginPath(); ctx.ellipse(f.x+f.w/2-2*(f.vx>0?1:-1), f.y+f.h/2, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(f.x+3, f.y+3, 2, 2);
+    }
+  }
+  function drawPopups(){ for(let i=popups.length-1;i>=0;i--){ const p=popups[i]; p.t+=STEP; const a=Math.max(0,1-p.t/1.0);
+      ctx.globalAlpha=a; ctx.fillStyle='#000'; ctx.fillRect(p.x-1,p.y-9-p.t*30, ctx.measureText(p.msg).width+10, 16);
+      ctx.globalAlpha=a; ctx.fillStyle='#fff'; ctx.font='12px ui-monospace,monospace'; ctx.fillText(p.msg,p.x+2,p.y-p.t*30);
+      ctx.globalAlpha=1; if(a<=0) popups.splice(i,1);
+  } }
+
+  // ---------- HUD ----------
+  function updateHud(){
+    const name=LEVELS[LIDX].name;
+    const fire = player.fire ? ' · FIRE' : '';
+    hud.textContent = `LVL ${LIDX+1}: ${name} · TIME ${levelTime.toFixed(1)} · SCORE ${String(score).padStart(3,'0')} · COINS ${totalCoins()} · LIVES ${lives} · ${player.big?'BIG':'SMALL'}${fire} · ${biome.toUpperCase()}`;
+  }
+
+  // ---------- Controls ----------
+  function togglePause(){ if(!won) paused=!paused; }
+  function toggleBiome(){ setBiome(biome==='earth'?'moon':'earth'); }
+
+  // ---------- Utils ----------
+  function escapeHtml(s){ return s.replace(/[&<>"]/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])); }
+  window.addEventListener('pointerdown', ()=>ensureAudio(), {once:true});
+
+  // Boot
+	resizeCanvas();          // ensure correct size on first paint
+	loadLevel(0);
+	requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
