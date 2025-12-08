@@ -176,7 +176,6 @@ function showIntroModule() {
   const daily = getTodayDailyMeta();
 
   container.innerHTML = `
-    <h2>Hi ${name} 👋</h2>
     <p>Select a level:</p>
     <button onclick="startQuiz('easy')">🟢 Easy ${levelTrophies.easy ? "🏆" : ""}</button>
     <button onclick="startQuiz('medium')" ${unlockedLevels.medium ? "" : "disabled"}>🟡 Medium ${levelTrophies.medium ? "🏆" : ""}</button>
@@ -190,6 +189,8 @@ function showIntroModule() {
       <div style="margin-top:.5rem; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
         <button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
         <button onclick="openCoinRain()">🪙 Coin Rain</button>
+        <!-- NEW: Coin Collect button linking to your uploaded game -->
+        <a href="coincollect.html" target="_blank" rel="noopener"><button type="button">🕹️ Coin Collect</button></a>
         <button onclick="openShop()">🛍️ Shop</button>
       </div>
     </div>
@@ -197,7 +198,6 @@ function showIntroModule() {
     <hr>
     <a href="learning.html"><button type="button">📘 Learn About Credit Scores</button></a>
     <a href="tips.html"><button type="button">💡 Credit Score Tips</button></a>
-    <button onclick="toggleMusic()">🎵 Toggle Music</button>
     <button onclick="logoutUser()">🚪 Logout</button>
   `;
 
