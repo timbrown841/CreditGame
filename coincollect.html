@@ -100,6 +100,7 @@
   <div class="top-right">
     <button class="tiny" id="btnBiome" aria-label="Toggle Moon">🌕 Moon: OFF</button>
     <button class="tiny" id="btnLevels" aria-label="Level Select">📜 Levels</button>
+	<button class="tiny" id="btnMusic" aria-label="Toggle music">🎵 Music: ON</button>
   </div>
 
   <!-- Results banner -->
@@ -215,6 +216,41 @@ window.addEventListener('orientationchange', resizeCanvas);
     jackpot:()=>{ensureAudio();beep({freq:1200,type:'triangle',dur:0.16});}, puff:()=>{ensureAudio();beep({freq:300,type:'triangle',dur:0.06,vol:0.15});},
     shoot:()=>{ensureAudio();beep({freq:720,type:'square',dur:0.08});}, hit:()=>{ensureAudio();beep({freq:300,type:'sawtooth',dur:0.06});}
   };
+  
+
+  // ---------- Background music ----------
+  const music = new Audio('./RetroCircuit.mp3'); // keep file next to index.html
+  music.loop = true;
+  music.volume = 0.35; // tweak volume as you like
+  let musicEnabled = true;
+  let musicTriedStart = false; // we retry until a user gesture allows play
+  function updateMusicBtn(){
+  const b = document.getElementById('btnMusic');
+  if (b) b.textContent = `🎵 Music: ${musicEnabled ? 'ON' : 'OFF'}`;
+  }
+  
+  async function startMusicSafe(){
+  if(!musicEnabled || musicTriedStart) return;
+  musicTriedStart = true;
+  try {
+  await music.play();
+  } catch (e) {
+  // Browser blocked autoplay—wait for another user gesture and try again.
+  musicTriedStart = false;
+  }
+}
+  
+  function toggleMusic(){
+  musicEnabled = !musicEnabled;
+  updateMusicBtn();
+  if (musicEnabled) startMusicSafe();
+  else music.pause();
+  }
+  // Auto pause when tab is hidden; resume when visible
+  document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) music.pause();
+  else if(musicEnabled) startMusicSafe();
+  });
 
   // ---------- Level data ----------
   const LEVELS = [
@@ -267,6 +303,10 @@ window.addEventListener('orientationchange', resizeCanvas);
   if (btnNext) btnNext.addEventListener('click', () => nextLevel());
   const levelModal=document.getElementById('levelModal');
   const levelList=document.getElementById('levelList');
+  const btnMusic = document.getElementById('btnMusic');
+  updateMusicBtn();
+  btnMusic.addEventListener('click', toggleMusic);
+
 
   // ---------- Input ----------
   const keys=new Set(); const btnState={left:false,right:false,jump:false,shoot:false}; let prevJump=false, prevShoot=false;
@@ -278,6 +318,7 @@ window.addEventListener('orientationchange', resizeCanvas);
     if(k==='l'||k==='L') toggleLevelModal(true);
     if(k>='1'&&k<='9' && levelModal.classList.contains('show')) { const i=Number(k)-1; if(i<LEVELS.length) selectLevel(i); }
     if(k==='Enter' && resultsBanner.classList.contains('show')) nextLevel();
+	startMusicSafe();
   });
   window.addEventListener('keyup',e=>{ keys.delete(norm(e)); });
 
@@ -288,8 +329,14 @@ window.addEventListener('orientationchange', resizeCanvas);
   bindHold(btnLeft, v=>btnState.left=v); bindHold(btnRight, v=>btnState.right=v); bindHold(btnJump, v=>btnState.jump=v, true);
   bindHold(btnShoot, v=>btnState.shoot=v, true);
   btnPause.addEventListener('click',()=>togglePause()); btnBiome.addEventListener('click',()=>toggleBiome()); btnLevels.addEventListener('click',()=>toggleLevelModal(true));
-  function bindHold(el,fn,prevent=false){ const start=e=>{fn(true); if(prevent) e.preventDefault();}; const end=()=>fn(false);
-    el.addEventListener('pointerdown',start); el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); el.addEventListener('pointerleave',end); }
+  function bindHold(el,fn,prevent=false){ 
+  const start=e=>{fn(true); if(prevent) e.preventDefault(); startMusicSafe(); };
+  const end=()=>fn(false);
+  el.addEventListener('pointerdown',start); 
+  el.addEventListener('pointerup',end); 
+  el.addEventListener('pointercancel',end); 
+  el.addEventListener('pointerleave',end); 
+}
 
   // ---------- Entities / helpers ----------
   const rect=(x,y,w,h)=>({x,y,w,h}); const overlap=(a,b)=>!(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
@@ -927,7 +974,7 @@ function drawFinishFlags(){
 
   // ---------- Utils ----------
   function escapeHtml(s){ return s.replace(/[&<>"]/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])); }
-  window.addEventListener('pointerdown', ()=>ensureAudio(), {once:true});
+  window.addEventListener('pointerdown', ()=>{ ensureAudio(); startMusicSafe(); }, {once:true});
 
   // Boot
 	resizeCanvas();          // ensure correct size on first paint
