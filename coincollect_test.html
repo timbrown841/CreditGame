@@ -24,10 +24,39 @@
     .card{background:#0e1118;border:1px solid #2a2f3a;border-radius:14px;padding:16px;color:#fff;font:14px ui-monospace,monospace;min-width:360px}
     .list button{display:block;width:100%;text-align:left;margin-top:6px;padding:8px;border-radius:10px;background:#ffffff10;border:1px solid #ffffff25;color:#fff}
     .list button:hover{background:#ffffff18}
+	
+	/* Center the game area and leave room for HUD (top) + controls (bottom) */
+	.stage{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	min-height:100vh;                 /* fill screen height */
+	/* leave space so fixed HUD/pills don’t overlap the canvas */
+	padding:80px 0 120px;             /* top, sides, bottom */
+	box-sizing:border-box;
+	padding-top:calc(80px + env(safe-area-inset-top));
+	padding-bottom:calc(120px + env(safe-area-inset-bottom));
+	}
+	
+	/* Phone tweaks */
+	@media (max-width: 768px){
+	.stage{
+	padding-top:calc(120px + env(safe-area-inset-top));   /* a bit more room for HUD text */
+	padding-bottom:calc(150px + env(safe-area-inset-bottom)); /* room for touch controls */
+	}
+	.hud{ font-size:12px; }
+	/* Optional: hide the little hint pill on phones if you want more space */
+	/* .pill{ display:none; } */
+	/* Or move the pill above controls instead of top-left */
+	/* .pill{ top:auto; bottom:calc(150px + 8px); } */
+	}
+	
   </style>
 </head>
 <body>
+  <div class="stage">
   <canvas id="game" aria-label="Game canvas"></canvas>
+  </div>
   <div class="hud" id="hud">LVL 1: Launchpad · TIME 0.0 · SCORE 000 · COINS 0 · LIVES 3 · SMALL · EARTH</div>
   <div class="pill" id="hint">←/→ move, Z/Space (double jump), <b>X shoot</b>, P pause, R retry, M Moon, L Level Select</div>
   <div class="top-right">
