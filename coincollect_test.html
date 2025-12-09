@@ -12,6 +12,27 @@
     .top-right{position:fixed;right:10px;top:40px;display:flex;gap:8px}
     .tiny{padding:8px 10px;border-radius:10px;background:#ffffff18;border:1px solid #ffffff30;color:#fff;font:12px ui-monospace,monospace}
     .pill{position:fixed;right:10px;top:10px;padding:6px 10px;border-radius:999px;background:#ffffff18;border:1px solid #ffffff30;color:#fff;font:12px ui-monospace,monospace}
+	/* Phone: place instructions below the HUD so they don't overlap */
+	@media (max-width: 768px){
+	.hud{ z-index: 4; }           /* ensure HUD stays on top if needed */
+	.pill{
+	top: 72px;                  /* lower than the HUD line */
+	right: 10px;
+	bottom: auto;
+	z-index: 3;                 /* above canvas, below modals */
+	}
+}
+	/* Alternative: dock the instructions above the touch controls */
+	/*
+	@media (max-width: 768px){
+	.pill{
+	top: auto;
+	right: 10px;
+	bottom: calc(150px + env(safe-area-inset-bottom));  // sits above on-screen buttons
+	z-index: 3;
+	}
+}
+*/
     .banner{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;border-radius:14px;background:#000d;color:#fff;font:16px ui-monospace,monospace;border:1px solid #ffffff33;display:none;min-width:360px}
     .banner.show{display:block}
     .results{margin-top:8px;border-top:1px dashed #ffffff44;padding-top:8px}
