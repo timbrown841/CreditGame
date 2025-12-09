@@ -12,8 +12,46 @@
     .top-right{position:fixed;right:10px;top:40px;display:flex;gap:8px}
     .tiny{padding:8px 10px;border-radius:10px;background:#ffffff18;border:1px solid #ffffff30;color:#fff;font:12px ui-monospace,monospace}
     .pill{position:fixed;right:10px;top:10px;padding:6px 10px;border-radius:999px;background:#ffffff18;border:1px solid #ffffff30;color:#fff;font:12px ui-monospace,monospace}
+	/* Phone: place instructions below the HUD so they don't overlap */
+	@media (max-width: 768px){
+	.hud{ z-index: 4; }           /* ensure HUD stays on top if needed */
+	.pill{
+	top: 72px;                  /* lower than the HUD line */
+	right: 10px;
+	bottom: auto;
+	z-index: 3;                 /* above canvas, below modals */
+	}
+}
+	/* Alternative: dock the instructions above the touch controls */
+	/*
+	@media (max-width: 768px){
+	.pill{
+	top: auto;
+	right: 10px;
+	bottom: calc(150px + env(safe-area-inset-bottom));  // sits above on-screen buttons
+	z-index: 3;
+	}
+}
+*/
     .banner{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;border-radius:14px;background:#000d;color:#fff;font:16px ui-monospace,monospace;border:1px solid #ffffff33;display:none;min-width:360px}
     .banner.show{display:block}
+	/* Mobile-only Next button inside results banner */
+	@media (max-width: 768px){
+	.mobileActions{ display:flex; gap:8px; margin-top:10px; }
+	.mobileActions button{
+	flex:1;
+	padding:10px 12px;
+	border-radius:10px;
+	background:#ffffff18;
+	border:1px solid #ffffff30;
+	color:#fff;
+	font:14px ui-monospace,monospace;
+	}
+}
+	@media (min-width: 769px){
+	.mobileActions{ display:none; }
+}
+
     .results{margin-top:8px;border-top:1px dashed #ffffff44;padding-top:8px}
     .controls{position:fixed;inset:auto 0 0 0;display:flex;gap:10px;justify-content:space-between;padding:10px}
     .btn{flex:0 0 auto;width:84px;height:84px;border-radius:22px;background:#ffffff22;backdrop-filter:blur(6px);border:1px solid #ffffff33;color:#fff}
@@ -24,10 +62,39 @@
     .card{background:#0e1118;border:1px solid #2a2f3a;border-radius:14px;padding:16px;color:#fff;font:14px ui-monospace,monospace;min-width:360px}
     .list button{display:block;width:100%;text-align:left;margin-top:6px;padding:8px;border-radius:10px;background:#ffffff10;border:1px solid #ffffff25;color:#fff}
     .list button:hover{background:#ffffff18}
+	
+	/* Center the game area and leave room for HUD (top) + controls (bottom) */
+	.stage{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	min-height:100vh;                 /* fill screen height */
+	/* leave space so fixed HUD/pills don’t overlap the canvas */
+	padding:80px 0 120px;             /* top, sides, bottom */
+	box-sizing:border-box;
+	padding-top:calc(80px + env(safe-area-inset-top));
+	padding-bottom:calc(120px + env(safe-area-inset-bottom));
+	}
+	
+	/* Phone tweaks */
+	@media (max-width: 768px){
+	.stage{
+	padding-top:calc(120px + env(safe-area-inset-top));   /* a bit more room for HUD text */
+	padding-bottom:calc(150px + env(safe-area-inset-bottom)); /* room for touch controls */
+	}
+	.hud{ font-size:12px; }
+	/* Optional: hide the little hint pill on phones if you want more space */
+	/* .pill{ display:none; } */
+	/* Or move the pill above controls instead of top-left */
+	/* .pill{ top:auto; bottom:calc(150px + 8px); } */
+	}
+	
   </style>
 </head>
 <body>
-  <canvas id="game" width="960" height="540" aria-label="Game canvas"></canvas>
+  <div class="stage">
+  <canvas id="game" aria-label="Game canvas"></canvas>
+  </div>
   <div class="hud" id="hud">LVL 1: Launchpad · TIME 0.0 · SCORE 000 · COINS 0 · LIVES 3 · SMALL · EARTH</div>
   <div class="pill" id="hint">←/→ move, Z/Space (double jump), <b>X shoot</b>, P pause, R retry, M Moon, L Level Select</div>
   <div class="top-right">
@@ -37,10 +104,15 @@
 
   <!-- Results banner -->
   <div class="banner" id="resultsBanner">
-    <div id="resultsTitle">LEVEL CLEAR!</div>
-    <div class="results" id="resultsBody"></div>
-    <div style="margin-top:8px;opacity:0.9">Enter: Next · R: Retry · L: Level Select</div>
+  <div id="resultsTitle">LEVEL CLEAR!</div>
+  <div class="results" id="resultsBody"></div>
+  <div style="margin-top:8px;opacity:0.9">Enter: Next · R: Retry · L: Level Select</div>
+
+  <!-- Mobile-only actions -->
+  <div class="mobileActions">
+    <button id="btnNext" aria-label="Next level">▶ Next</button>
   </div>
+</div>
 
   <!-- Level select modal -->
   <div class="modal" id="levelModal" aria-modal="true">
@@ -69,7 +141,7 @@
   let phys = { gravity:2100, jumpSmall:620, jumpBig:680, maxFall:1250 };
   const MOVE_SPEED=220, AIR_ACCEL=1400, GROUND_ACCEL=3000, FRICTION=1800;
   const GOOMBA_SPEED=60, MUSHROOM_SPEED=80, FIRE_SPEED=420, FIRE_CD=0.22, FIRE_MAX=3;
-  const CANVAS_W=960, CANVAS_H=540, STEP=1/60;
+  const VW=960, VH=540, STEP=1/60;   // virtual width/height (logic space)
   const AVATAR_SCALE = 3.0;
   const GOOMBA_SCALE = 3.0;   // increase to make the alien bigger
 
@@ -87,6 +159,33 @@
   // ---------- Canvas ----------
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled=false;
+  
+  // --- Responsive canvas (DPR aware) ---
+let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0, DPR = Math.max(1, window.devicePixelRatio||1);
+
+function resizeCanvas(){
+  DPR = Math.max(1, window.devicePixelRatio||1);
+  const controlsH = 110; // space for on-screen buttons
+  const availW = Math.max(320, window.innerWidth);
+  const availH = Math.max(240, window.innerHeight - controlsH);
+  const scaleCss = Math.min(availW / VW, availH / VH);
+
+  const cssW = Math.round(VW * scaleCss);
+  const cssH = Math.round(VH * scaleCss);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+
+  canvas.width  = Math.round(cssW * DPR);
+  canvas.height = Math.round(cssH * DPR);
+
+  viewScale = canvas.width / VW;
+  viewOffsetX = 0;
+  viewOffsetY = 0;
+  ctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
+
 
   // ---------- Load avatar image ----------
   const avatarImg = new Image();
@@ -164,6 +263,8 @@
   const resultsBody=document.getElementById('resultsBody');
   const btnBiome=document.getElementById('btnBiome');
   const btnLevels=document.getElementById('btnLevels');
+  const btnNext = document.getElementById('btnNext');
+  if (btnNext) btnNext.addEventListener('click', () => nextLevel());
   const levelModal=document.getElementById('levelModal');
   const levelList=document.getElementById('levelList');
 
@@ -218,9 +319,22 @@
   function loadLevel(i){
     LIDX=i;
     const def=LEVELS[LIDX];
-    ASCII=def.ascii.slice(); H=ASCII.length; W=ASCII[0].length;
-    at=(tx,ty)=> (tx>=0&&ty>=0&&tx<W&&ty<H) ? ASCII[ty][tx] : 'X';
-    isSolid=(tx,ty)=> SOLID.has(at(tx,ty));
+    ASCII = def.ascii.slice();
+	H = ASCII.length;
+	// width = longest line (some rows are shorter on Moonbase)
+	W = ASCII.reduce((m, row) => Math.max(m, row.length), 0);
+	
+	// Safe tile accessor: empty outside a short row, solid outside bounds
+	at = (tx, ty) => {
+	if (tx >= 0 && ty >= 0 && ty < H) {
+    const row = ASCII[ty];
+    if (typeof row === 'string' && tx < row.length) return row[tx];
+    return ' '; // beyond this row's length => empty space (not 'X')
+  }
+  return 'X'; // outside level vertically => solid stopper
+  };
+  isSolid = (tx, ty) => SOLID.has(at(tx, ty));
+
 
     if(def.biome) setBiome(def.biome);
     if (def.name === "Moonbase") carveMoonbaseGaps();
@@ -258,6 +372,7 @@
     updateHud();
     buildLevelList();
     resultsBanner.classList.remove('show');
+	toggleLevelModal(false);
   }
 
   // Cavern Run extras (coins + goombas)
@@ -279,39 +394,49 @@
   }
 
   // Create fall-through gaps in Moonbase long X rows
-  function carveMoonbaseGaps(){
-    const gapWidth = 5;
-    const gapColsTop  = [28, 60, 92, 124, 156];
-    const gapColsBottom = [16, 48, 88, 120, 148];
-
-    const xOnlyRowIdxs = [];
-    for(let y=0;y<H;y++){ if (/^X+$/.test(LEVELS[2].ascii[y])) xOnlyRowIdxs.push(y); }
-
-    const rows = xOnlyRowIdxs.slice(0, 2);
-    if (rows[0] != null){
-      ASCII[rows[0]] = carveGapsInRow(ASCII[rows[0]], gapColsTop, gapWidth);
-    }
-    moonLowerIdx = -1;
-    moonLowerGapRangesPx = [];
-    if (rows[1] != null){
-      ASCII[rows[1]] = carveGapsInRow(ASCII[rows[1]], gapColsBottom, gapWidth);
-      moonLowerIdx = rows[1];
-      for(const c of gapColsBottom){
-        const x0 = c * TILE;
-        const x1 = (c + gapWidth) * TILE;
-        moonLowerGapRangesPx.push({x0, x1});
-      }
-    }
-  }
   function carveGapsInRow(row, cols, width){
-    let s=row;
-    for(const c of cols){
-      for(let k=0;k<width;k++){
-        const idx=c+k; if(idx>=0 && idx<s.length){ s = s.substring(0, idx) + ' ' + s.substring(idx+1); }
+  // pad row to W so we can safely replace at any column
+  let s = row.padEnd(W, ' ');
+  for(const c of cols){
+    for(let k=0;k<width;k++){
+      const idx = c + k;
+      if (idx >= 0 && idx < W) {
+        s = s.substring(0, idx) + ' ' + s.substring(idx+1);
       }
     }
-    return s;
   }
+  return s;
+}
+
+function carveMoonbaseGaps(){
+  const gapWidth = 5;
+  const gapColsTop  = [28, 60, 92, 124, 156];
+  const gapColsBottom = [16, 48, 88, 120, 148];
+
+  const xOnlyRowIdxs = [];
+  for (let y=0; y<H; y++) {
+    const row = ASCII[y] ?? '';
+    // detect rows that are all 'X' (ignoring trailing spaces)
+    if (/^X+$/.test(row.trim()) && row.trim().length >= 10) xOnlyRowIdxs.push(y);
+  }
+
+  // Top belt
+  if (xOnlyRowIdxs[0] != null) {
+    ASCII[xOnlyRowIdxs[0]] = carveGapsInRow(ASCII[xOnlyRowIdxs[0]], gapColsTop, gapWidth);
+  }
+
+  // Bottom belt + remember gap ranges for fall detection
+  moonLowerIdx = -1;
+  moonLowerGapRangesPx = [];
+  if (xOnlyRowIdxs[1] != null) {
+    const y = xOnlyRowIdxs[1];
+    ASCII[y] = carveGapsInRow(ASCII[y], gapColsBottom, gapWidth);
+    moonLowerIdx = y;
+    for (const c of gapColsBottom) {
+      moonLowerGapRangesPx.push({ x0: c*TILE, x1: (c+gapWidth)*TILE });
+    }
+  }
+}
 
   // ---------- Level select UI ----------
   function buildLevelList(){
@@ -513,8 +638,17 @@
 
     // Dust
     for(let i=dust.length-1;i>=0;i--){ const p=dust[i]; p.t+=dt; p.vy+=phys.gravity*0.3*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; if(p.t>p.life) dust.splice(i,1); }
+	
+	// Camera follow (smooth & clamped to level bounds)
+	{
+	const levelWidthPx = W * TILE;
+	const maxCam = Math.max(0, levelWidthPx - VW);
+	const desired = clamp(player.x + player.w/2 - VW/2, 0, maxCam);
+	const camLerp = 0.18;          // set to 1 for hard lock
+	camera.x += (desired - camera.x) * camLerp;
+	camera.y = 0;
+	}
 
-    const target=clamp(player.x+player.w/2-CANVAS_W/2,0,W*TILE-CANVAS_W); camera.x += (target-camera.x)*0.12; camera.y=0;
 
     updateHud();
   }
@@ -562,28 +696,38 @@
 
   // ---------- Rendering ----------
   function draw(){
-    ctx.setTransform(1,0,0,1,0,0); drawSky();
+	ctx.setTransform(viewScale,0,0,viewScale,viewOffsetX,viewOffsetY); // scale world→pixels
+	drawSky();
     ctx.save(); ctx.translate(-camera.x*0.35,0); drawBackgroundLayer(); ctx.restore();
 
     ctx.save(); ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
     drawTiles(); drawPlatforms(); drawFinishFlags(); drawCoins(); drawMushrooms(); drawGoombas(); drawDust(); drawFireballs(); drawPlayer(); drawPopups();
     ctx.restore();
 
-    ctx.fillStyle= biome==='moon' ? '#4c4c4c' : '#2b2b2b'; ctx.fillRect(0,CANVAS_H-8,CANVAS_W,8);
+	ctx.fillStyle= biome==='moon' ? '#4c4c4c' : '#2b2b2b'; ctx.fillRect(0,VH-8,VW,8);
   }
 
   function drawSky(){
-    if(biome==='moon'){ ctx.fillStyle='#0b0e18'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-      for(let i=0;i<60;i++){ const sx=(i*157+(performance.now()/50|0))%CANVAS_W, sy=(i*97)%CANVAS_H; ctx.fillStyle=i%7===0?'#a6c8ff':'#ffffff'; ctx.fillRect(sx,sy,2,2); }
-    } else { ctx.fillStyle='#6ad0ff'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H); }
+  if(biome==='moon'){
+    ctx.fillStyle='#0b0e18'; ctx.fillRect(0,0,VW,VH);
+    for(let i=0;i<60;i++){
+      const sx = (i*157 + ((performance.now()/50)|0)) % VW;
+      const sy = (i*97) % VH;
+      ctx.fillStyle = i%7===0 ? '#a6c8ff' : '#ffffff';
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+  } else {
+    ctx.fillStyle='#6ad0ff'; ctx.fillRect(0,0,VW,VH);
   }
+}
+
   function drawBackgroundLayer(){
-    if(biome==='moon'){ ctx.fillStyle='#6a6a6a'; const baseY=CANVAS_H-80;
+	if(biome==='moon'){ ctx.fillStyle='#6a6a6a'; const baseY=VH-80;
       for(let i=-1;i<10;i++){ const x=i*220+(Math.sin(i)*40);
         ctx.beginPath(); ctx.ellipse(x+110, baseY, 90, 18, 0, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle='#5a5a5a'; ctx.beginPath(); ctx.ellipse(x+110, baseY+10, 60, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#6a6a6a';
       }
-    } else { ctx.fillStyle='#9be370'; const baseY=CANVAS_H-64;
+	} else { ctx.fillStyle='#9be370'; const baseY=VH-64;
       for(let i=-1;i<12;i++){ const x=i*220+(Math.sin(i)*40);
         ctx.beginPath(); ctx.moveTo(x,baseY); ctx.quadraticCurveTo(x+110,baseY-80,x+220,baseY); ctx.closePath(); ctx.fill();
       }
@@ -786,28 +930,10 @@ function drawFinishFlags(){
   window.addEventListener('pointerdown', ()=>ensureAudio(), {once:true});
 
   // Boot
-  loadLevel(0);
-  requestAnimationFrame(loop);
+	resizeCanvas();          // ensure correct size on first paint
+	loadLevel(0);
+	requestAnimationFrame(loop);
 })();
-
-	
-  function endGameAndReport(totalCoins) {
-    try {
-      // Send to opener (quickstart) – only if we have one
-      if (window.opener) {
-        window.opener.postMessage(
-          { type: "coincollect_result", coins: Number(totalCoins) || 0 },
-          window.location.origin // restrict to same-origin
-        );
-      }
-    } catch (e) { /* ignore */ }
-    // Optional: auto-close tab
-    window.close();
-  }
-  // call endGameAndReport(score) when your game finishes
-	
 </script>
 </body>
 </html>
-
-
