@@ -35,6 +35,23 @@
 */
     .banner{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;border-radius:14px;background:#000d;color:#fff;font:16px ui-monospace,monospace;border:1px solid #ffffff33;display:none;min-width:360px}
     .banner.show{display:block}
+	/* Mobile-only Next button inside results banner */
+	@media (max-width: 768px){
+	.mobileActions{ display:flex; gap:8px; margin-top:10px; }
+	.mobileActions button{
+	flex:1;
+	padding:10px 12px;
+	border-radius:10px;
+	background:#ffffff18;
+	border:1px solid #ffffff30;
+	color:#fff;
+	font:14px ui-monospace,monospace;
+	}
+}
+	@media (min-width: 769px){
+	.mobileActions{ display:none; }
+}
+
     .results{margin-top:8px;border-top:1px dashed #ffffff44;padding-top:8px}
     .controls{position:fixed;inset:auto 0 0 0;display:flex;gap:10px;justify-content:space-between;padding:10px}
     .btn{flex:0 0 auto;width:84px;height:84px;border-radius:22px;background:#ffffff22;backdrop-filter:blur(6px);border:1px solid #ffffff33;color:#fff}
@@ -87,10 +104,15 @@
 
   <!-- Results banner -->
   <div class="banner" id="resultsBanner">
-    <div id="resultsTitle">LEVEL CLEAR!</div>
-    <div class="results" id="resultsBody"></div>
-    <div style="margin-top:8px;opacity:0.9">Enter: Next · R: Retry · L: Level Select</div>
+  <div id="resultsTitle">LEVEL CLEAR!</div>
+  <div class="results" id="resultsBody"></div>
+  <div style="margin-top:8px;opacity:0.9">Enter: Next · R: Retry · L: Level Select</div>
+
+  <!-- Mobile-only actions -->
+  <div class="mobileActions">
+    <button id="btnNext" aria-label="Next level">▶ Next</button>
   </div>
+</div>
 
   <!-- Level select modal -->
   <div class="modal" id="levelModal" aria-modal="true">
@@ -241,6 +263,8 @@ window.addEventListener('orientationchange', resizeCanvas);
   const resultsBody=document.getElementById('resultsBody');
   const btnBiome=document.getElementById('btnBiome');
   const btnLevels=document.getElementById('btnLevels');
+  const btnNext = document.getElementById('btnNext');
+  if (btnNext) btnNext.addEventListener('click', () => nextLevel());
   const levelModal=document.getElementById('levelModal');
   const levelList=document.getElementById('levelList');
 
