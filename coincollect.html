@@ -357,6 +357,45 @@ window.addEventListener('orientationchange', resizeCanvas);
   let goombas=[], coins=[], qblocks=new Set(), checkpoints=[], plats=[], finishFlags=[], bricks=new Set();
   let player=null, camera={x:0,y:0}, score=0, lives=3, paused=false, won=false, dust=[], mushrooms=[], fireballs=[];
   let levelTime=0, levelScoreStart=0, levelCoinStart=0;
+  
+  // === Credit Quest award helper ===
+  const apiBase = "https://credit-api-uhou.onrender.com";
+  let _cc_awardedThisLevel = false; // guard to prevent double-awards
+  
+  async function awardCoinsToUser(amount) {
+  const gained = Number(amount) || 0;
+  if (gained <= 0 || _cc_awardedThisLevel) return;
+  _cc_awardedThisLevel = true;
+
+  try {
+    const username = (localStorage.getItem("playerName") || "").trim();
+    if (username) {
+      await fetch(`${apiBase}/reward-coins`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, amount: gained })
+      }).catch(()=>{});
+    }
+
+    // Keep local UI/state in sync for when user goes back
+    const cur = Number(localStorage.getItem("playerCoins") || 0);
+    localStorage.setItem("playerCoins", String(cur + gained));
+  } finally {
+    // Also try to notify opener/parent (if same-origin and open)
+    const msg = { type: "coincollect_result", coins: gained };
+    try {
+      if (window.opener && window.opener.origin === window.location.origin) {
+        window.opener.postMessage(msg, window.location.origin);
+      }
+    } catch {}
+    try {
+      if (window.parent && window.parent !== window && window.parent.origin === window.location.origin) {
+        window.parent.postMessage(msg, window.location.origin);
+      }
+    } catch {}
+  }
+}
+
 
   // Moonbase lower-belt info
   let moonLowerIdx = -1;
@@ -706,6 +745,10 @@ function carveMoonbaseGaps(){
     const coinsNow=totalCoins(), coinsDelta=coinsNow-levelCoinStart;
     const scoreDelta=score-levelScoreStart;
     const t=levelTime, grade = t<20?'S': t<35?'A': t<55?'B':'C';
+	
+	// ← NEW: award server-side + try to notify parent/opener
+	awardCoinsToUser(coinsDelta);
+	
     resultsBody.innerHTML = `
       <div><b>${escapeHtml(def.name)}</b> — Time: ${t.toFixed(1)}s, Grade: <b>${grade}</b></div>
       <div>Coins: +${coinsDelta} · Score: +${scoreDelta}</div>
@@ -715,8 +758,14 @@ function carveMoonbaseGaps(){
     resultsBanner.classList.add('show');
   }
 
-  function nextLevel(){ if(LIDX < LEVELS.length-1){ loadLevel(LIDX+1); } else { loadLevel(0); } }
-  function retryLevel(){ loadLevel(LIDX); }
+  function nextLevel(){
+  _cc_awardedThisLevel = false;           // ← reset guard
+  if(LIDX < LEVELS.length-1){ loadLevel(LIDX+1); } else { loadLevel(0); } 
+ }
+  function retryLevel(){
+  _cc_awardedThisLevel = false;           // ← reset guard
+  loadLevel(LIDX); 
+ }
 
   // ---------- Actions ----------
   function doJump(double){
