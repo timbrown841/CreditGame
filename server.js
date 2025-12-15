@@ -316,14 +316,18 @@ async function generateQuestionsBatch(level, n = 100, preferredTags = []) {
   return docs.length;
 }
 
-/* ---------- Admin auth helper ---------- */
 function basicAuthOk(req) {
-  const [scheme, token] = String(req.headers.authorization || "").split(" ");
+  const hdr = String(req.headers.authorization || "");
+  const [scheme, token] = hdr.split(" ");
   if (scheme !== "Basic" || !token) return false;
   const [user, pass] = Buffer.from(token, "base64").toString("utf8").split(":");
-  return user === (process.env.ADMIN_USERNAME || "admin")
-      && pass === (process.env.ADMIN_PASSWORD || "admin123");
+  return (
+    user === (process.env.ADMIN_USERNAME || "admin") &&
+    pass === (process.env.ADMIN_PASSWORD || "admin123")
+  );
 }
+
+/* ---------- Admin auth helper ---------- */
 
 /* ---------- Core endpoints (register/login/etc.) ---------- */
 app.get("/", (_req, res) => res.send("🟢 Credit Quest API is running"));
@@ -674,18 +678,6 @@ app.get("/quiz/stats", async (req, res) => {
     res.status(500).json({ error: "server_error" });
   }
 });
-
-
-function basicAuthOk(req) {
-  const hdr = String(req.headers.authorization || "");
-  const [scheme, token] = hdr.split(" ");
-  if (scheme !== "Basic" || !token) return false;
-  const [user, pass] = Buffer.from(token, "base64").toString("utf8").split(":");
-  return (
-    user === (process.env.ADMIN_USERNAME || "admin") &&
-    pass === (process.env.ADMIN_PASSWORD || "admin123")
-  );
-}
 
 /* ---------- Admin helpers ---------- */
 app.get("/admin/questions", async (req, res) => {
