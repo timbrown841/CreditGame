@@ -3,10 +3,13 @@ import mongoose from "mongoose";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
-dotenv.config();
+dotenv.config(); // <-- move here
 
 const app = express();
+app.set("trust proxy", 1);   // ← add this line
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -18,38 +21,91 @@ if (!mongoUri || !mongoUri.startsWith("mongodb+srv://")) {
   console.error("❌ Invalid or missing MONGO_URI");
   process.exit(1);
 }
-await mongoose
-  .connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("✅ Connected to MongoDB Atlas"))
-  .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
+	try {
+		await mongoose.connect(mongoUri);
+		console.log("✅ Connected to MongoDB Atlas");
+	} catch (err) {
+		console.error("❌ MongoDB connection error:", err);
+		process.exit(1);
+}
+
+// ---------- Email (verification) ----------
+const MAIL_FROM = process.env.MAIL_FROM || "Credit Quest <cs@creditquest.co.uk>";
+const APP_BASE_URL = process.env.APP_BASE_URL || ""; // e.g. https://credit-api-uhou.onrender.com
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,              // e.g. smtp.office365.com
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: Number(process.env.SMTP_PORT) === 465,
+  requireTLS: Number(process.env.SMTP_PORT) !== 465,
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+});
+
+transporter.verify()
+  .then(() => console.log("📧 SMTP ready"))
+  .catch(err => console.warn("⚠️ SMTP not ready:", err?.message || err));
+
+function buildVerifyURL(req, token, email) {
+  const base = APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
+  return `${base}/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+}
+
+async function sendVerificationEmail(toEmail, username, url) {
+  const subject = "Verify your Credit Quest account";
+  const html = `
+    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;line-height:1.5">
+      <h2>Welcome to Credit Quest, ${username}!</h2>
+      <p>Please verify your email address to finish creating your account.</p>
+      <p><a href="${url}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Verify my email</a></p>
+      <p>Or copy this link:<br><code>${url}</code></p>
+      <p style="color:#666">This link expires in 24 hours.</p>
+    </div>
+  `;
+  await transporter.sendMail({
+    from: MAIL_FROM,
+    to: toEmail,
+    subject,
+    html,
+    replyTo: process.env.MAIL_REPLY_TO || "cs@creditquest.co.uk",
   });
+}
 
 /* ---------- Schemas ---------- */
-const UserSchema = new mongoose.Schema(
-  {
-    username: { type: String, index: true, unique: true },
-    email: String,
-    password: String,
-    avatar: String,
-    coins: { type: Number, default: 0 },
-    scores: [{ level: String, score: Number, date: { type: Date, default: Date.now } }],
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, index: true },
+  email:    { type: String, required: true, unique: true, index: true },
+  password: { type: String, required: true },
+  avatar:   { type: String, default: "blackboy.png" },
+  coins:    { type: Number, default: 0 },
 
-    ownedItems: { type: [String], default: [] },
-    avatarFrame: { type: String, default: "" },
-    trailId: { type: String, default: "" },
-    themeId: { type: String, default: "" },
-    boosterUntil: { type: Number, default: 0 },
+  scores: [
+    { level: String, score: Number, date: { type: Date, default: Date.now } }
+  ],
 
-    quizMastered: {
-      easy:   { type: [String], default: [] },
-      medium: { type: [String], default: [] },
-      hard:   { type: [String], default: [] },
-    },
+  // Email verification
+  isVerified:          { type: Boolean, default: false },
+  verificationToken:   { type: String, default: null, index: true },
+  verificationExpires: { type: Date,   default: null },
+
+  // Shop / cosmetics
+  ownedItems:   { type: [String], default: [] },
+  avatarFrame:  { type: String, default: "" },
+  trailId:      { type: String, default: "" },
+  themeId:      { type: String, default: "" },
+  boosterUntil: { type: Number, default: 0 },
+
+  // Quiz mastering
+  quizMastered: {
+    easy:   { type: [String], default: [] },
+    medium: { type: [String], default: [] },
+    hard:   { type: [String], default: [] },
   },
-  { versionKey: false }
-);
+}, { versionKey: false });
+
+// (Optional) case-insensitive uniqueness via collation at collection level
+UserSchema.index({ username: 1 }, { unique: true, collation: { locale: "en", strength: 2 } });
+UserSchema.index({ email: 1 },    { unique: true, collation: { locale: "en", strength: 2 } });
+
 const User = mongoose.model("User", UserSchema);
 
 const QuestionSchema = new mongoose.Schema(
@@ -275,31 +331,81 @@ app.get("/", (_req, res) => res.send("🟢 Credit Quest API is running"));
 app.post("/register", async (req, res) => {
   try {
     const { username, email, password, avatar } = req.body || {};
-    if (!username || !email || !password) return res.status(400).send("All fields required");
-    const exists = await ciFind(User, username);
-    if (exists) return res.status(400).send("Username already exists");
+    if (!username || !email || !password) {
+      return res.status(400).send("All fields required");
+    }
+
+    const existsUser  = await User.findOne({ username: new RegExp(`^${String(username).trim()}$`, "i") });
+    if (existsUser) return res.status(400).send("Username already exists");
+    const existsEmail = await User.findOne({ email: new RegExp(`^${String(email).trim()}$`, "i") });
+    if (existsEmail) return res.status(400).send("Email already in use");
+
     const allowedAvatars = ["blackboy.png","blackgirl.png","latinboy.png","whiteboy.png","whitegirl.png"];
     const finalAvatar = allowedAvatars.includes(avatar) ? avatar : "blackboy.png";
+
+    // token (24h)
+	const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     const hash = await bcrypt.hash(String(password), 10);
-    await User.create({ username, email, password: hash, avatar: finalAvatar, coins: 0 });
-    res.send("User registered successfully");
-  } catch (err) { console.error("Registration error:", err); res.status(500).send("Registration failed"); }
+	
+
+    await User.create({
+      username: String(username).trim(),
+      email:    String(email).trim().toLowerCase(),
+      password: hash,
+      avatar:   finalAvatar,
+      coins:    0,
+      isVerified: false,
+      verificationToken:   token,
+      verificationExpires: expires,
+    });
+
+    const verifyURL = buildVerifyURL(req, token, String(email).trim().toLowerCase());
+    try {
+      await sendVerificationEmail(String(email).trim().toLowerCase(), String(username).trim(), verifyURL);
+    } catch (e) {
+      console.error("❌ Failed to send verification email:", e);
+      // You can still allow re-send later; keep account pending.
+    }
+
+    return res.status(201).json({ ok: true, message: "Registration successful — check your email to verify." });
+  } catch (err) {
+    console.error("Registration error:", err);
+    return res.status(500).send("Registration failed");
+  }
 });
 
 app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body || {};
-    const user = await ciFind(User, username);
+    const user = await User.findOne({ username: new RegExp(`^${String(username).trim()}$`, "i") });
     if (!user) return res.status(404).send("User not found");
+
     const match = await bcrypt.compare(String(password), user.password);
     if (!match) return res.status(401).send("Incorrect password");
-    res.json({
-      username: user.username, email: user.email, avatar: user.avatar,
-      coins: user.coins || 0, avatarFrame: user.avatarFrame || "",
-      trailId: user.trailId || "", themeId: user.themeId || "",
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: "not_verified",
+        message: "Please verify your email before logging in."
+      });
+    }
+
+    return res.json({
+      username: user.username,
+      email:    user.email,
+      avatar:   user.avatar,
+      coins:    user.coins || 0,
+      avatarFrame:  user.avatarFrame || "",
+      trailId:      user.trailId || "",
+      themeId:      user.themeId || "",
       boosterUntil: user.boosterUntil || 0,
     });
-  } catch (err) { console.error("Login error:", err); res.status(500).send("Login failed"); }
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).send("Login failed");
+  }
 });
 
 app.post("/submit-score", async (req, res) => {
@@ -342,6 +448,58 @@ app.get("/results", async (req, res) => {
     res.json(user.scores || []);
   } catch (err) { console.error("Results error:", err); res.status(500).send("Failed to load results"); }
 });
+
+app.get("/verify", async (req, res) => {
+  try {
+    const { token, email } = req.query || {};
+    if (!token || !email) return res.status(400).send("Missing token or email.");
+
+    const user = await User.findOne({
+      email: String(email).trim().toLowerCase(),
+      verificationToken: String(token),
+    });
+    if (!user) return res.status(400).send("Invalid verification link.");
+
+    if (!user.verificationExpires || user.verificationExpires < new Date()) {
+      return res.status(400).send("Verification link has expired. Please request a new one.");
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null;
+    user.verificationExpires = null;
+    await user.save();
+
+    const redirectTo = process.env.VERIFIED_REDIRECT || "https://creditquest.onrender.com/verified.html";
+    return res.redirect(redirectTo);
+  } catch (err) {
+    console.error("Verify error:", err);
+    return res.status(500).send("Verification failed");
+  }
+});
+
+app.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).send("Email required.");
+
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
+    if (!user) return res.status(404).send("User not found.");
+    if (user.isVerified) return res.status(400).send("Already verified.");
+
+    const token = crypto.randomBytes(32).toString("hex");
+    user.verificationToken = token;
+    user.verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    const url = buildVerifyURL(req, token, String(email).trim().toLowerCase());
+    await sendVerificationEmail(user.email, user.username || "there", url);
+    return res.send("Verification email resent.");
+  } catch (e) {
+    console.error("Resend error:", e);
+    return res.status(500).send("Could not send email.");
+  }
+});
+
 
 /* ---------- Inventory (shop) ---------- */
 app.get("/inventory", async (req, res) => {
@@ -516,6 +674,18 @@ app.get("/quiz/stats", async (req, res) => {
     res.status(500).json({ error: "server_error" });
   }
 });
+
+
+function basicAuthOk(req) {
+  const hdr = String(req.headers.authorization || "");
+  const [scheme, token] = hdr.split(" ");
+  if (scheme !== "Basic" || !token) return false;
+  const [user, pass] = Buffer.from(token, "base64").toString("utf8").split(":");
+  return (
+    user === (process.env.ADMIN_USERNAME || "admin") &&
+    pass === (process.env.ADMIN_PASSWORD || "admin123")
+  );
+}
 
 /* ---------- Admin helpers ---------- */
 app.get("/admin/questions", async (req, res) => {
