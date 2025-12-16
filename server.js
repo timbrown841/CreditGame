@@ -34,11 +34,17 @@ const MAIL_FROM = process.env.MAIL_FROM || "Credit Quest <cs@creditquest.co.uk>"
 const APP_BASE_URL = process.env.APP_BASE_URL || ""; // e.g. https://credit-api-uhou.onrender.com
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,              // e.g. smtp.office365.com
+  host: process.env.SMTP_HOST,         // smtp.office365.com
   port: Number(process.env.SMTP_PORT || 587),
-  secure: Number(process.env.SMTP_PORT) === 465,
-  requireTLS: Number(process.env.SMTP_PORT) !== 465,
+  secure: false,                       // STARTTLS on 587
+  requireTLS: true,
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  connectionTimeout: 15000,            // 15s
+  greetingTimeout: 10000,              // 10s
+  socketTimeout: 20000,                // 20s
+  pool: true,                          // optional but helps
+  maxConnections: 2,
+  maxMessages: 20
 });
 
 transporter.verify()
