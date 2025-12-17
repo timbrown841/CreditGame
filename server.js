@@ -112,7 +112,7 @@ UserSchema.index({ email: 1 },    { unique: true, collation: { locale: "en", str
 
 const User = mongoose.model("User", UserSchema);
 // after connecting to Mongo:
-await User.syncIndexes();
+// await User.syncIndexes();
 
 const QuestionSchema = new mongoose.Schema(
   {
