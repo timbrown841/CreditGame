@@ -74,21 +74,6 @@ async function sendVerificationEmail(toEmail, username, url) {
   }
 }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend failed: ${res.status} ${text}`);
-  }
-}
-
 /* ---------- Schemas ---------- */
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, index: true },
