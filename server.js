@@ -76,8 +76,8 @@ async function sendVerificationEmail(toEmail, username, url) {
 
 /* ---------- Schemas ---------- */
 const UserSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true, index: true },
-  email:    { type: String, required: true, unique: true, index: true },
+  username: { type: String, required: true },
+  email:    { type: String, required: true },
   password: { type: String, required: true },
   avatar:   { type: String, default: "blackboy.png" },
   coins:    { type: Number, default: 0 },
@@ -111,6 +111,8 @@ UserSchema.index({ username: 1 }, { unique: true, collation: { locale: "en", str
 UserSchema.index({ email: 1 },    { unique: true, collation: { locale: "en", strength: 2 } });
 
 const User = mongoose.model("User", UserSchema);
+// after connecting to Mongo:
+await User.syncIndexes();
 
 const QuestionSchema = new mongoose.Schema(
   {
