@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
-import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
 dotenv.config(); // <-- move here
@@ -33,46 +32,43 @@ if (!mongoUri || !mongoUri.startsWith("mongodb+srv://")) {
 const MAIL_FROM = process.env.MAIL_FROM || "Credit Quest <cs@creditquest.co.uk>";
 const APP_BASE_URL = process.env.APP_BASE_URL || ""; // e.g. https://credit-api-uhou.onrender.com
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,         // smtp.office365.com
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: false,                       // STARTTLS on 587
-  requireTLS: true,
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 30000,
-	// Office 365 sometimes prefers IPv4 from some hosts
-  family: 4
-});
-
-transporter.verify()
-  .then(() => console.log("📧 SMTP ready"))
-  .catch(err => console.warn("⚠️ SMTP not ready:", err?.message || err));
-
 function buildVerifyURL(req, token, email) {
   const base = APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
   return `${base}/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 }
 
+// --- HTTPS mailer via Resend API (no SMTP) ---
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
 async function sendVerificationEmail(toEmail, username, url) {
-  const subject = "Verify your Credit Quest account";
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;line-height:1.5">
-      <h2>Welcome to Credit Quest, ${username}!</h2>
-      <p>Please verify your email address to finish creating your account.</p>
-      <p><a href="${url}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Verify my email</a></p>
-      <p>Or copy this link:<br><code>${url}</code></p>
-      <p style="color:#666">This link expires in 24 hours.</p>
-    </div>
-  `;
-  await transporter.sendMail({
-    from: MAIL_FROM,
-    to: toEmail,
-    subject,
-    html,
-    replyTo: process.env.MAIL_REPLY_TO || "cs@creditquest.co.uk",
+  const payload = {
+    from: process.env.MAIL_FROM,                 // "Credit Quest <support@creditquest.co.uk>"
+    to: [toEmail],
+    subject: "Verify your Credit Quest account",
+    html: `
+      <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;line-height:1.5">
+        <h2>Welcome to Credit Quest, ${username}!</h2>
+        <p>Please verify your email address to finish creating your account.</p>
+        <p><a href="${url}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Verify my email</a></p>
+        <p>Or copy this link:<br><code>${url}</code></p>
+        <p style="color:#666">This link expires in 24 hours.</p>
+      </div>
+    `
+  };
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
   });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Resend failed: ${res.status} ${text}`);
+  }
 }
 
 /* ---------- Schemas ---------- */
