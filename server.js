@@ -843,10 +843,9 @@ app.post("/admin/questions/generate", async (req, res) => {
 
 // in server.js, above app.listen(...)
 app.get("/reset-password", (req, res) => {
-  const { token = "", email = "" } = req.query || {};
-  const redirectBase = process.env.RESET_REDIRECT || "https://creditquest.onrender.com/reset-password.html";
-  const url = `${redirectBase}?token=${encodeURIComponent(token)}&email=${encodeURIComponent(String(email).toLowerCase())}`;
-  return res.redirect(url);
+  // simply redirect to the static page with the same query
+  const q = new URLSearchParams(req.query).toString();
+  res.redirect(`/reset-password.html${q ? `?${q}` : ""}`);
 });
 
 /* ---------- Start ---------- */
