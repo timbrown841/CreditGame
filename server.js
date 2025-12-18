@@ -37,9 +37,12 @@ function buildVerifyURL(req, token, email) {
 }
 
 // --- HTTPS mailer via Resend API (no SMTP) ---
+// .env: FRONTEND_BASE_URL=https://creditquest.onrender.com  (or your domain)
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "https://creditquest.onrender.com";
+
 function buildResetURL(req, token, email) {
-  const base = APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
-  return `${base}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+  // always send users to the frontend page (not the API)
+  return `${FRONTEND_BASE_URL}/reset-password.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 }
 
 async function sendPasswordResetEmail(toEmail, username, url) {
@@ -836,6 +839,14 @@ app.post("/admin/questions/generate", async (req, res) => {
   const pref = Array.isArray(tags) ? tags.map((t) => String(t).toLowerCase()) : [];
   const made = await generateQuestionsBatch(level, count, pref);
   res.json({ ok: true, made });
+});
+
+// in server.js, above app.listen(...)
+app.get("/reset-password", (req, res) => {
+  const { token = "", email = "" } = req.query || {};
+  const redirectBase = process.env.RESET_REDIRECT || "https://creditquest.onrender.com/reset-password.html";
+  const url = `${redirectBase}?token=${encodeURIComponent(token)}&email=${encodeURIComponent(String(email).toLowerCase())}`;
+  return res.redirect(url);
 });
 
 /* ---------- Start ---------- */
