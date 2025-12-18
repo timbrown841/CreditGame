@@ -396,11 +396,32 @@ app.post("/login", async (req, res) => {
     if (!match) return res.status(401).send("Incorrect password");
 
     if (!user.isVerified) {
-      return res.status(403).json({
-        error: "not_verified",
-        message: "Please verify your email before logging in."
-      });
+  try {
+    // Ensure there is a valid (non-expired) token
+    const now = Date.now();
+    let token   = user.verificationToken;
+    let expires = user.verificationExpires;
+
+    if (!token || !expires || expires.getTime() < now) {
+      token = crypto.randomBytes(32).toString("hex");
+      expires = new Date(now + 24 * 60 * 60 * 1000); // 24h
+      user.verificationToken = token;
+      user.verificationExpires = expires;
+      await user.save();
     }
+
+    const verifyURL = buildVerifyURL(req, token, user.email);
+    await sendVerificationEmail(user.email, user.username, verifyURL);
+  } catch (e) {
+    console.error("Login-triggered verification email failed:", e);
+    // we still return 403 below
+  }
+
+  return res.status(403).json({
+    error: "not_verified",
+    message: "We just sent you a new verification email. Please check your inbox."
+  });
+}
 
     return res.json({
       username: user.username,
