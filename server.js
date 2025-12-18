@@ -29,7 +29,6 @@ if (!mongoUri || !mongoUri.startsWith("mongodb+srv://")) {
 }
 
 // ---------- Email (verification) ----------
-const MAIL_FROM = process.env.MAIL_FROM || "Credit Quest <cs@creditquest.co.uk>";
 const APP_BASE_URL = process.env.APP_BASE_URL || ""; // e.g. https://credit-api-uhou.onrender.com
 
 function buildVerifyURL(req, token, email) {
@@ -38,7 +37,44 @@ function buildVerifyURL(req, token, email) {
 }
 
 // --- HTTPS mailer via Resend API (no SMTP) ---
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+function buildResetURL(req, token, email) {
+  const base = APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
+  return `${base}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+}
+
+async function sendPasswordResetEmail(toEmail, username, url) {
+  const payload = {
+    sender: {
+      email: process.env.MAIL_FROM_EMAIL,            // e.g. support@creditquest.co.uk
+      name:  process.env.MAIL_FROM_NAME || "Credit Quest",
+    },
+    to: [{ email: toEmail, name: username || toEmail }],
+    subject: "Reset your Credit Quest password",
+    htmlContent: `
+      <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;line-height:1.5">
+        <h2>Password reset</h2>
+        <p>Hello ${username || ""}, we received a request to reset your password.</p>
+        <p><a href="${url}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Set a new password</a></p>
+        <p>Or copy this link:<br><code>${url}</code></p>
+        <p style="color:#666">This link expires in 1 hour. If you didn’t request this, you can ignore the email.</p>
+      </div>
+    `,
+  };
+
+  const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Brevo send failed: ${resp.status} ${text}`);
+  }
+}
 
 async function sendVerificationEmail(toEmail, username, url) {
   const payload = {
@@ -81,6 +117,10 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   avatar:   { type: String, default: "blackboy.png" },
   coins:    { type: Number, default: 0 },
+  // Email password reset
+  resetToken:   { type: String, default: null, index: true },
+  resetExpires: { type: Date,   default: null },
+
 
   scores: [
     { level: String, score: Number, date: { type: Date, default: Date.now } }
@@ -112,7 +152,9 @@ UserSchema.index({ email: 1 },    { unique: true, collation: { locale: "en", str
 
 const User = mongoose.model("User", UserSchema);
 // after connecting to Mongo:
-// await User.syncIndexes();
+if (process.env.SYNC_INDEXES === "true") {
+  await User.syncIndexes();
+}
 
 const QuestionSchema = new mongoose.Schema(
   {
@@ -383,6 +425,74 @@ app.post("/register", async (req, res) => {
   } catch (err) {
     console.error("Registration error:", err);
     return res.status(500).send("Registration failed");
+  }
+});
+
+app.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!cleanEmail) return res.status(400).send("Email required.");
+
+    const user = await User.findOne({ email: cleanEmail });
+    // Always return 200 to avoid leaking whether the email exists
+    if (!user) return res.json({ ok: true, message: "If your email exists, a reset link has been sent." });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    user.resetToken = token;
+    user.resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const url = buildResetURL(req, token, cleanEmail);
+    try {
+      await sendPasswordResetEmail(user.email, user.username || "there", url);
+    } catch (e) {
+      console.error("❌ Failed to send password reset email:", e);
+      // Still respond success to avoid enumeration
+    }
+
+    return res.json({ ok: true, message: "If your email exists, a reset link has been sent." });
+  } catch (e) {
+    console.error("forgot-password error:", e);
+    return res.status(500).send("Could not process request.");
+  }
+});
+
+app.post("/reset-password", async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body || {};
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanToken = String(token || "");
+    const pwd = String(newPassword || "");
+
+    if (!cleanEmail || !cleanToken || !pwd) {
+      return res.status(400).json({ error: "bad_params" });
+    }
+    if (pwd.length < 8) {
+      return res.status(400).json({ error: "weak_password", message: "Password must be at least 8 characters." });
+    }
+
+    const user = await User.findOne({
+      email: cleanEmail,
+      resetToken: cleanToken,
+      resetExpires: { $gt: new Date() }, // not expired
+    });
+    if (!user) return res.status(400).json({ error: "invalid_or_expired" });
+
+    // Update password and clear reset fields
+    const hash = await bcrypt.hash(pwd, 10);
+    user.password = hash;
+    user.resetToken = null;
+    user.resetExpires = null;
+
+    // (Optional) Also verify the user after a successful reset, if your product allows that:
+    // user.isVerified = true;
+
+    await user.save();
+    return res.json({ ok: true, message: "Password updated. You can now log in." });
+  } catch (e) {
+    console.error("reset-password error:", e);
+    return res.status(500).json({ error: "server_error" });
   }
 });
 
