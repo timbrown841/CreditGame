@@ -44,47 +44,132 @@
       <input type="password" id="loginPassword" placeholder="Password" required /><br />
       <button type="submit">Login</button>
     </form>
+	
+	<!-- Forgot password trigger -->
+	<div style="margin-top:12px; text-align:center;">
+	<button id="forgotBtn" type="button" style="background:none;border:none;color:#4f46e5;cursor:pointer;text-decoration:underline;">
+    Forgot your password?
+	</button>
+	</div>
 
     <p>Don't have an account? <a href="register.html">Register here</a></p>
   </div>
 
+<!-- Minimal "Forgot password" modal -->
+<div id="forgotModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); align-items:center; justify-content:center; z-index:9999;">
+  <div role="dialog" aria-modal="true" aria-labelledby="forgotTitle"
+       style="background:#fff; width:100%; max-width:420px; border-radius:12px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,.15);">
+    <h3 id="forgotTitle" style="margin:0 0 8px; font-size:18px;">Reset your password</h3>
+    <p style="margin:0 0 12px; color:#555;">Enter the email you used for your account. We’ll email you a reset link.</p>
+    <form id="forgotForm">
+      <input id="forgotEmail" type="email" required placeholder="you@example.com"
+             style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+      <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
+        <button type="button" id="forgotCancel" style="padding:8px 12px; border:1px solid #ddd; background:#fff; border-radius:8px; cursor:pointer;">
+          Cancel
+        </button>
+        <button type="submit" style="padding:8px 12px; border:none; background:#4f46e5; color:#fff; border-radius:8px; cursor:pointer;">
+          Send reset link
+        </button>
+      </div>
+      <div id="forgotMsg" style="margin-top:10px; font-size:14px; display:none;"></div>
+    </form>
+  </div>
+</div>
+
   <script>
     const apiBase = "https://credit-api-uhou.onrender.com";
 
-    document.getElementById("loginForm").addEventListener("submit", function (e) {
-      e.preventDefault();
+    document.getElementById("loginForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
 
-      const username = document.getElementById("loginUsername").value.trim().toLowerCase();
-      const password = document.getElementById("loginPassword").value;
+  const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+  const password = document.getElementById("loginPassword").value;
 
-      if (!username || !password) {
-        alert("Please fill out all fields.");
+  if (!username || !password) {
+    alert("Please fill out all fields.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${apiBase}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    let payload = null;
+    const text = await res.text();
+    try { payload = JSON.parse(text); } catch { payload = text; }
+
+    if (!res.ok) {
+      if (res.status === 403 && payload && payload.error === "not_verified") {
+        alert(payload.message || "Please verify your email before logging in.");
         return;
       }
+      const msg = (payload && payload.message) ? payload.message : (typeof payload === "string" ? payload : "Login failed");
+      throw new Error(msg);
+    }
 
-      fetch(`${apiBase}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      })
-        .then(response => {
-          if (!response.ok) {
-            return response.text().then(text => { throw new Error(text); });
-          }
-          return response.json();
-        })
-        .then(data => {
-          // ✅ Store all relevant data for quickstart & guard
-          localStorage.setItem("playerName", data.username);
-          localStorage.setItem("playerAvatar", data.avatar);
-          localStorage.setItem("playerCoins", String(data.coins ?? 0));
+    const data = (typeof payload === "string") ? JSON.parse(payload) : payload;
 
-          window.location.href = "quickstart.html";
-        })
-        .catch(err => {
-          alert("❌ " + err.message);
-        });
+    localStorage.setItem("playerName", data.username);
+    localStorage.setItem("playerAvatar", data.avatar);
+    localStorage.setItem("playerCoins", String(data.coins ?? 0));
+
+    window.location.href = "quickstart.html";
+  } catch (err) {
+    alert("❌ " + err.message);
+  }
+});
+
+// Forgot password modal controls + submit
+const forgotBtn = document.getElementById("forgotBtn");
+const forgotModal = document.getElementById("forgotModal");
+const forgotCancel = document.getElementById("forgotCancel");
+const forgotForm = document.getElementById("forgotForm");
+const forgotEmail = document.getElementById("forgotEmail");
+const forgotMsg = document.getElementById("forgotMsg");
+
+function openForgot() {
+  forgotEmail.value = "";
+  forgotMsg.style.display = "none";
+  forgotMsg.textContent = "";
+  forgotModal.style.display = "flex";
+  setTimeout(() => forgotEmail.focus(), 0);
+}
+function closeForgot() {
+  forgotModal.style.display = "none";
+}
+
+forgotBtn.addEventListener('click', openForgot);
+forgotCancel.addEventListener('click', closeForgot);
+forgotModal.addEventListener('click', (e) => { if (e.target === forgotModal) closeForgot(); });
+
+forgotForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = forgotEmail.value.trim().toLowerCase();
+  if (!email) return;
+
+  forgotMsg.style.display = "block";
+  forgotMsg.style.color = "#555";
+  forgotMsg.textContent = "Sending…";
+
+  try {
+    await fetch(`${apiBase}/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
     });
+    // API returns generic success either way
+    forgotMsg.style.color = "green";
+    forgotMsg.textContent = "If your email exists, a reset link has been sent.";
+  } catch {
+    forgotMsg.style.color = "#d00";
+    forgotMsg.textContent = "Network error. Please try again.";
+  }
+});
+
   </script>
 </body>
 </html>
