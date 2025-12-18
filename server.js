@@ -4,6 +4,10 @@ import cors from "cors";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import crypto from 'crypto';
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config(); // <-- move here
 
@@ -13,6 +17,16 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+app.use(express.static(path.join(__dirname, "public")));
+app.get("/reset-password.html", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "reset-password.html"));
+});
+// Optional: support /reset-password (no .html)
+app.get("/reset-password", (req, res) => {
+  const q = new URLSearchParams(req.query).toString();
+  res.redirect(`/reset-password.html${q ? `?${q}` : ""}`);
+});
 
 /* ---------- Mongo ---------- */
 const mongoUri = process.env.MONGO_URI;
@@ -42,7 +56,8 @@ const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "https://creditquest.
 
 function buildResetURL(req, token, email) {
   // always send users to the frontend page (not the API)
-  return `${FRONTEND_BASE_URL}/reset-password.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+  const base = APP_BASE_URL || `${req.protocol}://${req.get("host")}`; // API base
+  return `${base}/reset-password.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 }
 
 async function sendPasswordResetEmail(toEmail, username, url) {
