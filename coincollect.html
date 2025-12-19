@@ -145,11 +145,10 @@
   <div class="banner" id="resultsBanner">
   <div id="resultsTitle">LEVEL CLEAR!</div>
   <div class="results" id="resultsBody"></div>
-  <div style="margin-top:8px;opacity:0.9">Enter: Next · R: Retry · L: Level Select</div>
-
   <!-- Mobile-only actions -->
   <div class="mobileActions">
     <button id="btnNext" aria-label="Next level">▶ Next</button>
+	<button id="btnEnd"  aria-label="End game"  style="display:none">⏹ End</button>
   </div>
 </div>
 
@@ -340,6 +339,8 @@ window.addEventListener('orientationchange', resizeCanvas);
   const btnLevels=document.getElementById('btnLevels');
   const btnNext = document.getElementById('btnNext');
   if (btnNext) btnNext.addEventListener('click', () => nextLevel());
+  const btnEnd  = document.getElementById('btnEnd');
+  if (btnEnd)  btnEnd.addEventListener('click', () => endGame());
   const levelModal=document.getElementById('levelModal');
   const levelList=document.getElementById('levelList');
   const btnMusic = document.getElementById('btnMusic');
@@ -851,18 +852,51 @@ function carveMoonbaseGaps(){
 	// ← NEW: award server-side + try to notify parent/opener
 	awardCoinsToUser(coinsDelta);
 	
-    resultsBody.innerHTML = `
-      <div><b>${escapeHtml(def.name)}</b> — Time: ${t.toFixed(1)}s, Grade: <b>${grade}</b></div>
-      <div>Coins: +${coinsDelta} · Score: +${scoreDelta}</div>
-      <div style="margin-top:6px">Press <b>Enter</b> for Next, <b>R</b> to Retry, <b>L</b> to pick a level.</div>
-    `;
-    document.getElementById('resultsTitle').textContent = (LIDX===LEVELS.length-1) ? "GAME COMPLETE!" : "LEVEL CLEAR!";
+    const isFinal = (LIDX === LEVELS.length - 1);
+	resultsBody.innerHTML = `
+	<div><b>${escapeHtml(def.name)}</b> — Time: ${t.toFixed(1)}s, Grade: <b>${grade}</b></div>
+	<div>Coins: +${coinsDelta} · Score: +${scoreDelta}</div>
+	<div style="margin-top:6px">Enter: ${isFinal ? 'End' : 'Next'} · R: Retry · L: Level Select</div>
+	`;
+    document.getElementById('resultsTitle').textContent = 
+	(LIDX===LEVELS.length-1) ? "GAME COMPLETE!" : "LEVEL CLEAR!";
     resultsBanner.classList.add('show');
+	// Toggle mobile buttons
+	if (btnNext) btnNext.style.display = (LIDX === LEVELS.length - 1) ? 'none' : 'inline-block';
+	if (btnEnd)  btnEnd.style.display  = (LIDX === LEVELS.length - 1) ? 'inline-block' : 'none';
   }
+  
+  function endGame(){
+  // stop gameplay
+  paused = true;
+
+  // optional: stop music if you’re using it
+  try { music.pause(); } catch {}
+
+  // Show a final message in the same banner (already visible)
+  document.getElementById('resultsTitle').textContent = "THE END";
+  resultsBody.innerHTML += `<div style="margin-top:6px">Thanks for playing!</div>`;
+
+  // Hide the Next button, show End as “Close”
+  if (btnNext) btnNext.style.display = 'none';
+  if (btnEnd) {
+    btnEnd.textContent = 'Close';
+    btnEnd.style.display = 'inline-block';
+    btnEnd.onclick = () => {
+      // close the banner; player can choose Levels if desired
+      resultsBanner.classList.remove('show');
+      toggleLevelModal(true);
+    };
+  }
+}
 
   function nextLevel(){
   _cc_awardedThisLevel = false;           // ← reset guard
-  if(LIDX < LEVELS.length-1){ loadLevel(LIDX+1); } else { loadLevel(0); } 
+  if(LIDX < LEVELS.length-1){ 
+	loadLevel(LIDX+1); 
+	} else { 
+	endGame();        // ← no loop back to 0 
+	} 
  }
   function retryLevel(){
   _cc_awardedThisLevel = false;           // ← reset guard
