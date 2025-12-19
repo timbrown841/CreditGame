@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Your House – Credit Quest</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { font-family: Fredoka, system-ui, sans-serif; }
+    .wrap { max-width: 900px; margin: 24px auto; padding: 0 12px; }
+    .topbar { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+    .pill { background:#222; color:#fff; padding:6px 10px; border-radius:999px; font-size:14px; }
+    .scene { margin-top:16px; padding:16px; border-radius:16px; background: #f7fafc; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+    .room { display:grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+    .card { background:#fff; border-radius:12px; padding:12px; text-align:center; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+    .card .big { font-size:36px; line-height:1.1; }
+    .muted { color:#666; font-size:14px; }
+    .hstack { display:flex; gap:8px; flex-wrap:wrap; }
+    button { cursor:pointer; }
+    .garage { margin-top:16px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="hstack">
+        <a href="quickstart.html"><button type="button">← Back</button></a>
+        <button type="button" id="toShopBtn">🛍️ Go to Shop</button>
+      </div>
+      <span id="coinsPill" class="pill">Coins: 0</span>
+    </div>
+
+    <h2>🏠 Your House</h2>
+    <p class="muted">Decorate your house by buying items in the Shop.</p>
+
+    <div id="houseLock" class="scene" style="display:none;">
+      <p>You don’t own a house yet.</p>
+      <button id="buyHouseBtn" type="button">Buy House (60 🪙)</button>
+    </div>
+
+    <div id="houseOwned" class="scene" style="display:none;">
+      <h3>Rooms</h3>
+      <div class="room" id="livingRoom"></div>
+      <div class="room" id="bedRoom"></div>
+      <div class="room" id="bathRoom"></div>
+
+      <div class="garage">
+        <button id="garageBtn" type="button" style="margin-bottom:8px;">🚗 View Garage</button>
+        <div id="garageView" class="room" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = "https://credit-api-uhou.onrender.com";
+
+    const ITEMS = {
+      "furn-tv":       { name:"TV",            emoji:"📺", room:"livingRoom" },
+      "furn-rug":      { name:"Rug",           emoji:"🧶", room:"livingRoom" },
+      "furn-sofa":     { name:"Sofa",          emoji:"🛋️", room:"livingRoom" },
+      "furn-table":    { name:"Table",         emoji:"🛏️", room:"livingRoom" }, // table emoji lacks, using bed icon alt or swap for 🪑 if supported
+      "furn-phone":    { name:"Mobile Phone",  emoji:"📱", room:"livingRoom" },
+
+      "furn-bed":      { name:"Bed",           emoji:"🛏️", room:"bedRoom" },
+      "furn-wardrobe": { name:"Wardrobe",      emoji:"🧥", room:"bedRoom" },
+
+      "furn-bathtub":  { name:"Bathroom Tub",  emoji:"🛁", room:"bathRoom" },
+
+      "car-basic":     { name:"Car",           emoji:"🚗", room:"garageView" }
+    };
+
+    // Render a simple card
+    function card({emoji, name}) {
+      return `<div class="card"><div class="big">${emoji}</div><div>${name}</div></div>`;
+    }
+
+    async function boot() {
+      const username = (localStorage.getItem("playerName") || "").trim();
+      if (!username) { window.location.href = "login.html"; return; }
+
+      document.getElementById("toShopBtn").onclick = () => window.location.href = "quickstart.html#shop";
+      document.getElementById("garageBtn").onclick = () => {
+        const v = document.getElementById("garageView");
+        v.style.display = (v.style.display === "none" ? "grid" : "none");
+      };
+
+      try {
+        const res = await fetch(`${apiBase}/inventory?username=` + encodeURIComponent(username));
+        const inv = await res.json();
+        if (Number.isFinite(inv.coins)) document.getElementById("coinsPill").textContent = "Coins: " + inv.coins;
+
+        const owned = new Set(inv.ownedItems || []);
+        const hasHouse = owned.has("house-basic");
+
+        // Lock / owned toggles
+        document.getElementById("houseLock").style.display = hasHouse ? "none" : "block";
+        document.getElementById("houseOwned").style.display = hasHouse ? "block" : "none";
+
+        // Buy button
+        document.getElementById("buyHouseBtn").onclick = async () => {
+          const ok = confirm("Buy the Starter House for 60 coins?");
+          if (!ok) return;
+          const resp = await fetch(`${apiBase}/inventory/buy`, {
+            method:"POST", headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({ username, itemId:"house-basic", cost:60 })
+          });
+          if (!resp.ok) { alert(await resp.text()); return; }
+          alert("House purchased!");
+          location.reload();
+        };
+
+        if (!hasHouse) return;
+
+        // Fill rooms with owned items
+        for (const id of owned) {
+          const meta = ITEMS[id];
+          if (!meta) continue;
+          const slot = document.getElementById(meta.room);
+          if (slot) slot.insertAdjacentHTML("beforeend", card(meta));
+        }
+
+      } catch (e) {
+        console.error(e);
+        alert("Failed to load your house.");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", boot);
+  </script>
+</body>
+</html>
