@@ -261,7 +261,7 @@ function showIntroModule() {
         <button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
         <button onclick="openCoinRain()">🪙 Coin Rain</button>
         <!-- NEW: Coin Collect button linking to your uploaded game -->
-        <a href="coincollect.html" target="_blank" rel="noopener"><button type="button">🕹️ Coin Collect</button></a>
+		<button type="button" onclick="window.open('coincollect.html', '_blank', 'noopener')">🕹️ Coin Collect</button>
         <button onclick="openShop()">🛍️ Shop</button>
       </div>
     </div>
