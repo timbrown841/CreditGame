@@ -285,6 +285,7 @@ function showIntroModule() {
 	<button onclick="openCoinRain()">🪙 Coin Rain</button>
 	<button type="button" onclick="window.open('coincollect.html', '_blank', 'noopener')">🕹️ Coin Collect</button>
 	<button onclick="openShop()">🛍️ Shop</button>
+	<button onclick="window.location.href='house.html'">🏠 View House</button>
 	${
 		(localStorage.getItem("own_house-basic")==="1")
 		? `<button onclick="viewHouse()">🏠 View House</button>`
