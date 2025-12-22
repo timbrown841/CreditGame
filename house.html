@@ -1,132 +1,283 @@
+<!-- File: house.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Your House – Credit Quest</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
   <style>
-    body { font-family: Fredoka, system-ui, sans-serif; }
-    .wrap { max-width: 900px; margin: 24px auto; padding: 0 12px; }
-    .topbar { display:flex; gap:10px; align-items:center; justify-content:space-between; }
-    .pill { background:#222; color:#fff; padding:6px 10px; border-radius:999px; font-size:14px; }
-    .scene { margin-top:16px; padding:16px; border-radius:16px; background: #f7fafc; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
-    .room { display:grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
-    .card { background:#fff; border-radius:12px; padding:12px; text-align:center; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
-    .card .big { font-size:36px; line-height:1.1; }
-    .muted { color:#666; font-size:14px; }
-    .hstack { display:flex; gap:8px; flex-wrap:wrap; }
-    button { cursor:pointer; }
-    .garage { margin-top:16px; }
+    :root {
+      --house-w: 980px;   /* scale once, everything is percentage based */
+      --house-max: 96vw;
+    }
+    body { font-family: 'Fredoka', system-ui, sans-serif; }
+
+    .house-wrap {
+      margin: 24px auto;
+      width: min(var(--house-w), var(--house-max));
+      position: relative;
+      user-select: none;
+    }
+
+    /* The outline image as the stage */
+    .house-stage {
+      position: relative;
+      width: 100%;
+      padding-top: 62%;          /* aspect ratio placeholder (tweak to match your PNG) */
+      background: url('assets/house/house_outline.png') center/contain no-repeat;
+      border: 3px solid #1c2b3a;
+      border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.15);
+      overflow: hidden;
+    }
+
+    /* Clickable slots (in percentages so they scale with the stage) */
+    .slot {
+      position: absolute;
+      border: 2px dashed rgba(0,0,0,.25);
+      border-radius: 10px;
+      background: rgba(255,255,255,.2);
+      outline: none;
+      cursor: pointer;
+      transition: transform .08s ease-in-out, background .2s;
+    }
+    .slot:hover { transform: scale(1.02); background: rgba(255,255,255,.3); }
+    .slot.placed { border-style: solid; background: transparent; }
+
+    /* Placed item image */
+    .slot img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain; object-position: center bottom;
+      pointer-events: none;
+    }
+
+    /* Example positions — tweak visually as needed */
+    /* living room */
+    #slot-sofa     { left: 12%; top: 58%; width: 36%; height: 26%; }
+    #slot-tv       { left: 66%; top: 40%; width: 18%; height: 18%; }
+    #slot-rug      { left: 18%; top: 73%; width: 46%; height: 16%; }
+    #slot-table    { left: 44%; top: 60%; width: 14%; height: 10%; }
+
+    /* bedroom */
+    #slot-bed      { left: 58%; top: 58%; width: 34%; height: 26%; }
+    #slot-wardrobe { left: 75%; top: 26%; width: 16%; height: 18%; }
+
+    /* bathroom */
+    #slot-bathtub  { left: 8%;  top: 26%; width: 22%; height: 16%; }
+
+    /* garage (revealed when you click the toggle) */
+    .garage {
+      margin-top: 12px;
+      display: none;
+      width: 100%;
+      border: 3px solid #1c2b3a;
+      border-radius: 14px;
+      padding: 12px;
+      background: #0e2233;
+      color: #fff;
+    }
+    .garage .slot { border-color: rgba(255,255,255,.5); }
+    #slot-car     { position: relative; width: 50%; height: 160px; margin: 24px auto; }
+
+    .toolbar {
+      width: min(var(--house-w), var(--house-max));
+      margin: 8px auto 0;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      justify-content: space-between;
+    }
+    .toolbar .left, .toolbar .right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pill {
+      display: inline-block; padding: 6px 10px; border-radius: 999px;
+      background: #eef4ff; color: #243b6b; font-weight: 600; font-size: 14px;
+    }
+    .btn { padding: 8px 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; }
+    .btn.primary { background: #4f46e5; color: #fff; }
+    .btn.secondary { background: #ffcd3c; color: #000; }
+    .btn.ghost { background: #f2f4f7; color: #222; }
+    .hint { font-size: 14px; opacity: .8; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="hstack">
-        <a href="quickstart.html"><button type="button">← Back</button></a>
-        <button type="button" id="toShopBtn">🛍️ Go to Shop</button>
-      </div>
-      <span id="coinsPill" class="pill">Coins: 0</span>
+  <div class="toolbar">
+    <div class="left">
+      <a href="quickstart.html" class="btn ghost">⬅ Back to Game</a>
+      <span class="pill" id="coinPill">Coins: 0</span>
+      <span class="pill" id="houseBadge" style="display:none;">🏠 House owned</span>
     </div>
-
-    <h2>🏠 Your House</h2>
-    <p class="muted">Decorate your house by buying items in the Shop.</p>
-
-    <div id="houseLock" class="scene" style="display:none;">
-      <p>You don’t own a house yet.</p>
-      <button id="buyHouseBtn" type="button">Buy House (60 🪙)</button>
-    </div>
-
-    <div id="houseOwned" class="scene" style="display:none;">
-      <h3>Rooms</h3>
-      <div class="room" id="livingRoom"></div>
-      <div class="room" id="bedRoom"></div>
-      <div class="room" id="bathRoom"></div>
-
-      <div class="garage">
-        <button id="garageBtn" type="button" style="margin-bottom:8px;">🚗 View Garage</button>
-        <div id="garageView" class="room" style="display:none;"></div>
-      </div>
+    <div class="right">
+      <button id="garageToggle" class="btn secondary">View Garage</button>
+      <button id="resetBtn" class="btn">Reset Room</button>
     </div>
   </div>
 
+  <div class="house-wrap">
+    <div class="house-stage" id="houseStage">
+      <!-- Clickable placeholders -->
+      <button id="slot-sofa"     class="slot"   title="Place Sofa"></button>
+      <button id="slot-tv"       class="slot"   title="Place TV"></button>
+      <button id="slot-rug"      class="slot"   title="Place Rug"></button>
+      <button id="slot-table"    class="slot"   title="Place Table"></button>
+      <button id="slot-bed"      class="slot"   title="Place Bed"></button>
+      <button id="slot-wardrobe" class="slot"   title="Place Wardrobe"></button>
+      <button id="slot-bathtub"  class="slot"   title="Place Bathtub"></button>
+    </div>
+  </div>
+
+  <!-- Garage -->
+  <div class="garage" id="garagePanel">
+    <h3 style="margin: 6px 4px 0;">🚗 Garage</h3>
+    <div class="hint" style="margin: 2px 4px 8px;">Click the slot below to place your car.</div>
+    <button id="slot-car" class="slot" title="Place Car"></button>
+  </div>
+
   <script>
-    const apiBase = "https://credit-api-uhou.onrender.com";
-
+    /* ====== CONFIG: shop -> art mapping ====== */
+    // IDs must match your SHOP_ITEMS ids in script.js
     const ITEMS = {
-      "furn-tv":       { name:"TV",            emoji:"📺", room:"livingRoom" },
-      "furn-rug":      { name:"Rug",           emoji:"🧶", room:"livingRoom" },
-      "furn-sofa":     { name:"Sofa",          emoji:"🛋️", room:"livingRoom" },
-      "furn-table":    { name:"Table",         emoji:"🛏️", room:"livingRoom" }, // table emoji lacks, using bed icon alt or swap for 🪑 if supported
-      "furn-phone":    { name:"Mobile Phone",  emoji:"📱", room:"livingRoom" },
-
-      "furn-bed":      { name:"Bed",           emoji:"🛏️", room:"bedRoom" },
-      "furn-wardrobe": { name:"Wardrobe",      emoji:"🧥", room:"bedRoom" },
-
-      "furn-bathtub":  { name:"Bathroom Tub",  emoji:"🛁", room:"bathRoom" },
-
-      "car-basic":     { name:"Car",           emoji:"🚗", room:"garageView" }
+      'house-basic':     { type: 'house',  art: '' }, // gate to access page
+      'furn-sofa':       { type: 'furn',   art: 'assets/house/sofa.png' },
+      'furn-tv':         { type: 'furn',   art: 'assets/house/tv.png' },
+      'furn-rug':        { type: 'furn',   art: 'assets/house/rug2.png' },
+      'furn-table':      { type: 'furn',   art: '' },            // add asset when ready
+      'furn-bed':        { type: 'furn',   art: 'assets/house/bed.png' },
+      'furn-wardrobe':   { type: 'furn',   art: '' },            // add asset
+      'furn-bathtub':    { type: 'furn',   art: '' },            // add asset
+      'car-basic':       { type: 'car',    art: '' }             // add car asset
     };
 
-    // Render a simple card
-    function card({emoji, name}) {
-      return `<div class="card"><div class="big">${emoji}</div><div>${name}</div></div>`;
+    // Slot -> required item id
+    const SLOT_NEEDS = {
+      'slot-sofa':      'furn-sofa',
+      'slot-tv':        'furn-tv',
+      'slot-rug':       'furn-rug',
+      'slot-table':     'furn-table',
+      'slot-bed':       'furn-bed',
+      'slot-wardrobe':  'furn-wardrobe',
+      'slot-bathtub':   'furn-bathtub',
+      'slot-car':       'car-basic'
+    };
+
+    const OWN_KEY_PREFIX = 'own_';                // how you store ownership locally
+    const PLACEMENTS_KEY  = 'housePlacements';    // where we persist slot->item mapping
+
+    const placements = JSON.parse(localStorage.getItem(PLACEMENTS_KEY) || '{}');
+
+    function hasItem(id) {
+      // local quick check (populated by /inventory sync in your app)
+      if (localStorage.getItem(OWN_KEY_PREFIX + id) === '1') return true;
+
+      // fallback: allow owner of house to enter but require each item
+      return false;
     }
 
-    async function boot() {
-      const username = (localStorage.getItem("playerName") || "").trim();
-      if (!username) { window.location.href = "login.html"; return; }
+    function coinPillSync() {
+      const pill = document.getElementById('coinPill');
+      const coins = Number(localStorage.getItem('playerCoins') || 0);
+      if (pill) pill.textContent = `Coins: ${coins}`;
+    }
 
-      document.getElementById("toShopBtn").onclick = () => window.location.href = "quickstart.html#shop";
-      document.getElementById("garageBtn").onclick = () => {
-        const v = document.getElementById("garageView");
-        v.style.display = (v.style.display === "none" ? "grid" : "none");
-      };
-
-      try {
-        const res = await fetch(`${apiBase}/inventory?username=` + encodeURIComponent(username));
-        const inv = await res.json();
-        if (Number.isFinite(inv.coins)) document.getElementById("coinsPill").textContent = "Coins: " + inv.coins;
-
-        const owned = new Set(inv.ownedItems || []);
-        const hasHouse = owned.has("house-basic");
-
-        // Lock / owned toggles
-        document.getElementById("houseLock").style.display = hasHouse ? "none" : "block";
-        document.getElementById("houseOwned").style.display = hasHouse ? "block" : "none";
-
-        // Buy button
-        document.getElementById("buyHouseBtn").onclick = async () => {
-          const ok = confirm("Buy the Starter House for 60 coins?");
-          if (!ok) return;
-          const resp = await fetch(`${apiBase}/inventory/buy`, {
-            method:"POST", headers:{ "Content-Type":"application/json" },
-            body: JSON.stringify({ username, itemId:"house-basic", cost:60 })
-          });
-          if (!resp.ok) { alert(await resp.text()); return; }
-          alert("House purchased!");
-          location.reload();
-        };
-
-        if (!hasHouse) return;
-
-        // Fill rooms with owned items
-        for (const id of owned) {
-          const meta = ITEMS[id];
-          if (!meta) continue;
-          const slot = document.getElementById(meta.room);
-          if (slot) slot.insertAdjacentHTML("beforeend", card(meta));
-        }
-
-      } catch (e) {
-        console.error(e);
-        alert("Failed to load your house.");
+    function gateHouseAccess() {
+      const hasHouse = hasItem('house-basic');
+      if (hasHouse) {
+        document.getElementById('houseBadge').style.display = 'inline-block';
+        return;
       }
+      // If not owned, nudge user back to shop
+      alert('You need to buy the 🏠 Starter House (60 coins) in the Shop first.');
+      location.href = 'quickstart.html';
     }
 
-    document.addEventListener("DOMContentLoaded", boot);
+    function renderSlot(slotId) {
+      const btn = document.getElementById(slotId);
+      if (!btn) return;
+      btn.innerHTML = ''; // clear
+
+      const itemId = placements[slotId];
+      if (!itemId) {
+        btn.classList.remove('placed');
+        return;
+      }
+
+      const meta = ITEMS[itemId];
+      if (!meta || !meta.art) {
+        btn.classList.remove('placed');
+        return;
+      }
+
+      const img = document.createElement('img');
+      img.alt = itemId;
+      img.src = meta.art;
+      btn.appendChild(img);
+      btn.classList.add('placed');
+    }
+
+    function place(slotId) {
+      const need = SLOT_NEEDS[slotId];
+      if (!need) return;
+
+      if (!hasItem(need)) {
+        alert("You don't own this item yet. Buy it in the Shop first!");
+        return;
+      }
+
+      // Set/replace the item for this slot
+      placements[slotId] = need;
+      localStorage.setItem(PLACEMENTS_KEY, JSON.stringify(placements));
+      renderSlot(slotId);
+    }
+
+    function clearSlot(slotId) {
+      delete placements[slotId];
+      localStorage.setItem(PLACEMENTS_KEY, JSON.stringify(placements));
+      renderSlot(slotId);
+    }
+
+    function wireSlot(slotId) {
+      const el = document.getElementById(slotId);
+      if (!el) return;
+
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        const has = !!placements[slotId];
+        if (!has) {
+          place(slotId);
+        } else {
+          // simple inline menu
+          const choice = confirm("Replace/clear this item?\nOK = Clear\nCancel = Keep");
+          if (choice) clearSlot(slotId);
+        }
+      });
+    }
+
+    // Garage toggle
+    document.getElementById('garageToggle').addEventListener('click', () => {
+      const panel = document.getElementById('garagePanel');
+      const showing = panel.style.display === 'block';
+      panel.style.display = showing ? 'none' : 'block';
+      document.getElementById('garageToggle').textContent = showing ? 'View Garage' : 'Hide Garage';
+    });
+
+    // Reset
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!confirm('Reset all placed items?')) return;
+      Object.keys(placements).forEach(k => delete placements[k]);
+      localStorage.setItem(PLACEMENTS_KEY, JSON.stringify(placements));
+      Object.keys(SLOT_NEEDS).forEach(renderSlot);
+    });
+
+    // Boot
+    (() => {
+      coinPillSync();
+      gateHouseAccess();
+
+      // wire all slots
+      Object.keys(SLOT_NEEDS).forEach(id => wireSlot(id));
+      // render initial state
+      Object.keys(SLOT_NEEDS).forEach(id => renderSlot(id));
+    })();
   </script>
 </body>
 </html>
