@@ -39,6 +39,22 @@ const SHOP_ITEMS = [
 
   // Power-up
   { id: "boost-2x-30", type: "powerup", name: "2x Coins (30m)", cost: 25, x: 2, minutes: 30 },
+  
+  // --- HOUSING PACK ---
+  { id: "house-basic", type: "house", name: "Starter House", cost: 60 },
+  
+  // Furniture / belongings (only visible in house.html when owned)
+  { id: "furn-tv",        type: "furn", name: "TV",            cost: 12 },
+  { id: "furn-rug",       type: "furn", name: "Rug",           cost: 8  },
+  { id: "furn-phone",     type: "furn", name: "Mobile Phone",  cost: 10 },
+  { id: "furn-bed",       type: "furn", name: "Bed",           cost: 15 },
+  { id: "furn-wardrobe",  type: "furn", name: "Wardrobe",      cost: 14 },
+  { id: "furn-bathtub",   type: "furn", name: "Bathroom Tub",  cost: 14 },
+  { id: "furn-table",     type: "furn", name: "Table",         cost: 9  },
+  { id: "furn-sofa",      type: "furn", name: "Sofa",          cost: 16 },
+  
+  // Vehicle (garage)
+  { id: "car-basic",      type: "car",  name: "Car",           cost: 30 },
 ];
 
 /* ======= STATE ======= */
@@ -102,6 +118,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   handleDailyStreak();
   updateCoinsUI();
   updateXPUI();
+  
+  function viewHouse(){
+  if (localStorage.getItem("own_house-basic")==="1") {
+    window.location.href = "house.html";
+  } else {
+    alert("You need a house first. Buy it in the Shop.");
+    openShop();
+  }
+}
 
   showIntroModule();
   wireShopModal();
@@ -255,16 +280,18 @@ function showIntroModule() {
     <p id="coinCount" style="margin-top:.5rem;">🪙 Coins: ${currentCoins}</p>
     <div style="margin:.25rem 0 .5rem 0;">⭐ Level ${level}</div>
 
-    <div class="quiz-summary" style="margin-top:.5rem;">
-      <strong>🎯 Daily Challenge:</strong> ${daily.label} — Reward: +${DAILY_REWARD} coins
-      <div style="margin-top:.5rem; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
-        <button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
-        <button onclick="openCoinRain()">🪙 Coin Rain</button>
-        <!-- NEW: Coin Collect button linking to your uploaded game -->
-		<button type="button" onclick="window.open('coincollect.html', '_blank', 'noopener')">🕹️ Coin Collect</button>
-        <button onclick="openShop()">🛍️ Shop</button>
-      </div>
-    </div>
+    <div style="margin-top:.5rem; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+	<button onclick="startDaily()" ${daily.done ? "disabled" : ""}>${daily.done ? "Completed" : "Start Daily"}</button>
+	<button onclick="openCoinRain()">🪙 Coin Rain</button>
+	<button type="button" onclick="window.open('coincollect.html', '_blank', 'noopener')">🕹️ Coin Collect</button>
+	<button onclick="openShop()">🛍️ Shop</button>
+	${
+		(localStorage.getItem("own_house-basic")==="1")
+		? `<button onclick="viewHouse()">🏠 View House</button>`
+		: `<button onclick="openShop()">🏠 Buy House</button>`
+		}
+	</div>
+
 
     <hr>
     <a href="learning.html"><button type="button">📘 Learn About Credit Scores</button></a>
@@ -525,6 +552,17 @@ function wireShopModal() {
       document.body.classList.remove("no-scroll"); // unlock background
     });
   }
+  
+  // Auto-open shop if deep-linked via #shop
+  if (location.hash === "#shop") {
+	  openShop();
+	  setTimeout(() => {
+		  const houseCard = Array.from(document.querySelectorAll("#shopItems .shop-item"))
+		  .find(el => el.textContent.includes("Starter House"));
+		  houseCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+		  }, 150);
+		}
+
   // Click overlay to close
   const modal = document.getElementById("shopModal");
   if (modal) {
@@ -549,17 +587,53 @@ function isUsing(it){
 
 function renderShopItems(){
   const grid = document.getElementById("shopItems"); if (!grid) return;
+
   grid.innerHTML = SHOP_ITEMS.map(it => {
-    const owned = isOwned(it), using = isUsing(it);
-    const preview = it.type==="frame"  ? `<div class="frame-preview" style="border-color:${it.color}"></div>` :
-                   it.type==="trail"   ? `<div class="trail-preview" style="background:linear-gradient(${it.color}, transparent); height:32px;"></div>` :
-                   it.type==="bg"      ? `<div class="bg-preview" style="width:64px;height:36px;border-radius:8px;background:url('${it.asset}') center/cover;"></div>` :
-                   it.type==="avatar"  ? `<img alt="${it.name}" src="${it.asset}" style="width:48px;height:48px;border-radius:50%;border:2px solid #fff;">` :
-                   it.type==="powerup" ? `<div class="power-preview" style="font-weight:700;">⚡ ${it.x}x / ${it.minutes}m</div>` : "";
-    const status = it.type==="powerup" ? `Cost: ${it.cost} 🪙` : (owned ? (using?"Equipped":"Owned") : `Cost: ${it.cost} 🪙`);
-    const cta = it.type==="powerup" ? `<button onclick="activatePowerup('${it.id}')">Activate</button>`
-      : (!owned ? `<button onclick="buyItem('${it.id}')">Buy</button>` : (!using ? `<button onclick="equipItem('${it.id}')">Equip</button>` : `<button disabled>Equipped</button>`));
-    return `<div class="shop-item">${preview}<div><strong>${it.name}</strong></div><div>${status}</div><div style="margin-top:.25rem;">${cta}</div></div>`;
+    const owned = isOwned(it);
+    const equipable = ["frame","trail","bg","avatar"].includes(it.type);
+
+    // PREVIEW (kept simple icons for house/car/furn; swap to images anytime)
+    const preview =
+      it.type === "frame"   ? `<div class="frame-preview" style="border-color:${it.color}"></div>` :
+      it.type === "trail"   ? `<div class="trail-preview" style="background:linear-gradient(${it.color}, transparent); height:32px;"></div>` :
+      it.type === "bg"      ? `<div class="bg-preview" style="width:64px;height:36px;border-radius:8px;background:url('${it.asset||""}') center/cover;"></div>` :
+      it.type === "avatar"  ? `<img alt="${it.name}" src="${it.asset||""}" style="width:48px;height:48px;border-radius:50%;border:2px solid #fff;">` :
+      it.type === "powerup" ? `<div class="power-preview" style="font-weight:700;">⚡ ${it.x}x / ${it.minutes}m</div>` :
+      it.type === "house"   ? `<div style="font-size:28px;">🏠</div>` :
+      it.type === "car"     ? `<div style="font-size:28px;">🚗</div>` :
+      it.type === "furn"    ? `<div style="font-size:28px;">🛋️</div>` :
+                              `<div></div>`;
+						   
+	// STATUS LINE					   
+    const status = it.type==="powerup" 
+	? `Cost: ${it.cost} 🪙` 
+	: (owned ? `Owned` : `Cost: ${it.cost} 🪙`);
+	
+    // CTA BUTTONS
+    let cta = "";
+    if (it.type === "powerup") {
+      cta = `<button onclick="activatePowerup('${it.id}')">Activate</button>`;
+    } else if (!owned) {
+      cta = `<button onclick="buyItem('${it.id}')">Buy</button>`;
+    } else if (equipable) {
+      const using = isUsing(it);
+      cta = !using
+        ? `<button onclick="equipItem('${it.id}')">Equip</button>`
+        : `<button disabled>Equipped</button>`;
+    } else if (it.type === "house") {
+      cta = `<button onclick="viewHouse()">View House</button>`;
+    } else {
+      cta = `<button disabled>Owned</button>`;
+    }
+
+    return `
+      <div class="shop-item">
+        ${preview}
+        <div><strong>${it.name}</strong></div>
+        <div>${status}</div>
+        <div style="margin-top:.25rem;">${cta}</div>
+      </div>
+    `;
   }).join("");
 }
 
@@ -890,6 +964,9 @@ function itemTypeFromIdClient(itemId){
   if (itemId.startsWith("bg-"))    return "bg";
   if (itemId.startsWith("av-"))    return "avatar";
   if (itemId.startsWith("boost-")) return "powerup";
+  if (itemId.startsWith("house-")) return "house";
+  if (itemId.startsWith("furn-"))  return "furn";
+  if (itemId.startsWith("car-"))   return "car";
   return "unknown";
 }
 
