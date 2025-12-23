@@ -21,16 +21,21 @@
 
   <!-- Redirect guard: if already logged in, skip to quickstart -->
   <script>
-    (function () {
-      try {
-        const name = (localStorage.getItem('playerName') || '').trim();
-        const avatar = localStorage.getItem('playerAvatar');
-        if (name && avatar) {
-          window.location.replace('quickstart.html');
-        }
-      } catch (e) { /* ignore storage errors */ }
-    })();
-  </script>
+  (function () {
+    try {
+      const name = (localStorage.getItem('playerName') || '').trim();
+      const avatar = localStorage.getItem('playerAvatar');
+      if (name && avatar) {
+        // respect ?next=
+        const params = new URLSearchParams(location.search);
+        let next = params.get("next") || "quickstart.html";
+        // simple safety: only allow same-site paths
+        if (/^https?:/i.test(next)) next = "quickstart.html";
+        window.location.replace(next);
+      }
+    } catch (e) { /* ignore storage errors */ }
+  })();
+</script>
 
   <!-- Fonts and styles -->
   <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
@@ -119,7 +124,12 @@
     localStorage.setItem("playerAvatar", data.avatar);
     localStorage.setItem("playerCoins", String(data.coins ?? 0));
 
-    window.location.href = "quickstart.html";
+    // Respect ?next= for where to go after login
+	  const params = new URLSearchParams(location.search);
+	  let next = params.get("next") || "quickstart.html";
+	  // simple safety: only allow same-site paths
+	  if (/^https?:/i.test(next)) next = "quickstart.html";
+	  window.location.href = next;
   } catch (err) {
     alert("❌ " + err.message);
   }
