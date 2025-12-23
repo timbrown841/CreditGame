@@ -3,305 +3,229 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>My House — Credit Quest</title>
-<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
-<link rel="stylesheet" href="style.css"><!-- optional: your site styles -->
+<title>Your House — Credit Quest</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any" />
 
 <style>
   :root{
     --ink:#0b1220;
     --muted:#6b7280;
-    --panel:#f8fafc;
-    --panel-2:#eef2f7;
     --brand:#00c4cc;
-    --accent:#4f46e5;
-    --slot: #cfe7ff;
-    --slot-outline: #6aa3ff;
-    --placed:#8fd46a;
-    --wall:#f3f4f6;
-    --floor:#e9edf3;
+    --slot:#dff0ff;
+    --slot-outline:#6aa3ff;
+    --wall:#f7fafc;
+    --floor:#eef2f7;
   }
   *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:#f8fbff; color:var(--ink)}
+  header{display:flex; align-items:center; gap:10px; padding:12px 14px; background:#fff; border-bottom:1px solid rgba(0,0,0,.08); position:sticky; top:0; z-index:5}
+  header .spacer{flex:1}
+  button,a.btn{
+    appearance:none; border:1px solid rgba(0,0,0,.1); background:#fff; color:#1f2937;
+    padding:8px 12px; border-radius:10px; font-weight:600; text-decoration:none; cursor:pointer;
+  }
+  .primary{background:#4f46e5; color:#fff; border-color:transparent}
 
-  body{
-    margin:0;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-    background:
-      radial-gradient(80% 60% at 50% -10%, #ffffff 0, #f6fbff 40%, #eef6ff 100%);
-    color:var(--ink);
-  }
-
-  header{
-    position:sticky; top:0; z-index:10;
-    backdrop-filter:saturate(1.2) blur(6px);
-    background:rgba(255,255,255,.75);
-    border-bottom:1px solid rgba(0,0,0,.06);
-  }
-  .bar{
-    max-width:1100px; margin:0 auto; padding:12px 16px;
-    display:flex; gap:12px; align-items:center; justify-content:space-between;
-  }
-  .bar h1{ font-size:18px; margin:0; letter-spacing:.2px }
-  .bar .actions{ display:flex; gap:8px; flex-wrap:wrap }
-  button, .btn{
-    appearance:none; border:0; border-radius:10px; padding:10px 14px;
-    background:var(--accent); color:#fff; font-weight:600; cursor:pointer;
-    box-shadow:0 6px 14px rgba(79,70,229,.18);
-  }
-  .btn.secondary{ background:#fff; color:#1f2937; border:1px solid rgba(0,0,0,.08) }
-  .btn.ghost{ background:transparent; color:#1f2937 }
-  .tip{ color:var(--muted); font-size:14px; margin:12px auto 0; max-width:1100px; padding:0 16px 10px }
-
-  /* ----- GRID LAYOUT ----- */
-  .wrap{ max-width:1100px; margin:10px auto 34px; padding:0 16px }
-  .grid{
-    display:grid; gap:14px;
-    grid-template-columns: repeat(2, 1fr);
-  }
-  @media (max-width: 860px){
-    .grid{ grid-template-columns: 1fr; }
-  }
-
-  /* ----- ROOM CARD ----- */
-  .room{
-    position:relative;
-    border-radius:18px;
+  /* --- House board --- */
+  .wrap{max-width:1100px; margin:16px auto; padding:0 16px}
+  .house{
+    margin:0 auto; width:min(92vmin, 880px); aspect-ratio:1;
+    background:#fff; border:6px solid #1f2937; border-radius:18px; position:relative;
+    box-shadow:0 10px 30px rgba(12,20,40,.08);
     overflow:hidden;
-    box-shadow:0 10px 28px rgba(2,12,50,.08);
-    border:1px solid rgba(0,0,0,.06);
-    min-height:300px;
+  }
+  .rooms{
+    position:absolute; inset:10px;
+    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:10px;
+  }
+  .room{
+    position:relative; border:2px solid #1f2937; border-radius:12px; overflow:hidden;
+    background:
+      linear-gradient(180deg, var(--wall) 0 55%, var(--floor) 55% 100%);
   }
   .room .label{
-    position:absolute; left:14px; top:12px;
-    font-weight:700; font-size:14px; letter-spacing:.4px;
-    background:rgba(255,255,255,.9);
-    border:1px solid rgba(0,0,0,.06);
-    padding:6px 10px; border-radius:999px;
+    position:absolute; left:10px; top:10px; padding:4px 8px; border-radius:999px;
+    background:#fff; border:1px solid rgba(0,0,0,.12); font-size:12px; font-weight:700;
   }
-  .wall{
-    position:absolute; inset:0;
-    background:
-      linear-gradient(180deg, var(--wall), #ffffff 45%, var(--floor) 46%, #e7ebf2 100%);
-  }
-  /* subtle skylight + depth */
-  .wall::after{
-    content:""; position:absolute; inset:0;
-    background:
-      radial-gradient(60% 40% at 70% -10%, rgba(255,255,255,.85), transparent 55%),
-      linear-gradient(180deg, transparent 0 62%, rgba(0,0,0,.04) 62%, transparent 80%);
-    pointer-events:none;
-  }
+  .stage{position:absolute; inset:0; padding:16px}
 
-  /* stage is where pieces live (above walls) */
-  .stage{ position:absolute; inset:0; padding:18px; }
-
-  /* ----- SLOTS (placeholders) ----- */
+  /* ---- PLACEHOLDERS (shapes) ---- */
   .slot{
-    position:absolute;
+    position:absolute; cursor:pointer; user-select:none;
     outline:2px dashed var(--slot-outline);
-    background: repeating-linear-gradient(
-      45deg, var(--slot), var(--slot) 8px, rgba(255,255,255,.8) 8px, rgba(255,255,255,.8) 16px
-    );
-    box-shadow: inset 0 0 0 4px rgba(255,255,255,.8);
-    transition: transform .12s ease, box-shadow .12s ease;
-    cursor:pointer;
+    background:repeating-linear-gradient(45deg, var(--slot), var(--slot) 8px, #ffffff 8px, #ffffff 16px);
+    transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease;
   }
-  .slot:hover{ transform: translateY(-1px); box-shadow: inset 0 0 0 4px #fff, 0 6px 16px rgba(0,0,0,.08); }
-  .slot .tag{ position:absolute; bottom:-28px; left:0; right:0; margin:auto; text-align:center; font-size:12px; color:var(--muted) }
-
-  /* After placement */
-  .slot.placed{
-    outline-color: transparent;
-    background: var(--placed);
-    box-shadow: inset 0 0 0 3px rgba(255,255,255,.9), 0 10px 20px rgba(49,129,27,.18);
+  .slot:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.08) }
+  .slot .hint{ position:absolute; left:0; right:0; bottom:-22px; text-align:center; font-size:11px; color:var(--muted) }
+  .slot img{
+    position:absolute; inset:0; margin:auto; max-width:100%; max-height:100%;
+    object-fit:contain; display:none; pointer-events:none;
   }
+  .slot.placed{ outline-color:transparent; background:transparent }
+  .slot.placed img{ display:block }
 
-  /* ---- Specific shapes (pure CSS) ---- */
+  /* Sofa shape: seat (rounded rect) + back via before */
+  .sofa{ width:58%; height:22%; left:20%; bottom:10%; border-radius:26px/20px }
+  .sofa::before{ content:""; position:absolute; left:6%; right:6%; top:-38%; height:140%; border-radius:26px/28px; background:inherit; outline:inherit }
 
-  /* LIVING ROOM */
-  /* Sofa: pill seat + rounded back via pseudo */
-  .slot.sofa{ width:58%; height:22%; left:20%; bottom:12%; border-radius:26px/20px; }
-  .slot.sofa::before{
-    content:""; position:absolute; left:6%; right:6%; top:-35%;
-    height:140%; border-radius:26px/30px; background:inherit; outline:inherit;
-  }
-  .slot.rug{ width:64%; height:18%; left:18%; bottom:6%; border-radius:999px; }
-  .slot.tv{ width:46%; height:12%; right:8%; top:14%; border-radius:12px }
-  .slot.tv::after{
-    content:""; position:absolute; left:45%; bottom:-12px; width:10%; height:12px; background:inherit; border-radius:4px;
-  }
+  /* Rug: ellipse */
+  .rug{ width:64%; height:18%; left:18%; bottom:6%; border-radius:999px }
 
-  /* KITCHEN */
-  .slot.table{ width:42%; height:18%; left:10%; bottom:14%; border-radius:14px }
-  .slot.table::after{
-    content:""; position:absolute; left:10%; right:10%; bottom:-14px; height:14px;
-    background:inherit; border-radius:4px;
-  }
-  .slot.phone{ width:9%; height:8%; right:15%; top:24%; border-radius:6px }
+  /* TV: rounded rectangle with little stand */
+  .tv{ width:46%; height:14%; right:8%; top:10%; border-radius:12px }
+  .tv::after{ content:""; position:absolute; left:45%; bottom:-10px; width:10%; height:10px; background:inherit; border-radius:4px }
 
-  /* BEDROOM */
-  .slot.bed{ width:62%; height:24%; left:18%; bottom:12%; border-radius:18px }
-  .slot.bed::before, .slot.bed::after{
-    content:""; position:absolute; top:-30%; width:34%; height:55%;
-    background:inherit; border-radius:12px;
-  }
-  .slot.bed::before{ left:8%; }
-  .slot.bed::after{ right:8%; }
-  .slot.wardrobe{ width:18%; height:42%; right:8%; bottom:16%; border-radius:10px }
+  /* Coffee table: rounded rect */
+  .coffee{ width:28%; height:12%; left:36%; bottom:22%; border-radius:12px }
 
-  /* BATHROOM */
-  .slot.bathtub{ width:64%; height:22%; left:18%; bottom:12%; border-radius:999px }
-  .slot.bathtub::after{
-    content:""; position:absolute; right:10%; top:-10%; width:18%; height:18%;
-    border-top-left-radius:999px; border-top-right-radius:999px;
-    border:4px solid var(--slot-outline);
-    border-bottom:none; background:transparent;
+  /* Cabinet: low wide rect */
+  .cabinet{ width:40%; height:12%; left:8%; top:12%; border-radius:10px }
+
+  /* Kitchen shapes */
+  .table{ width:40%; height:16%; left:10%; bottom:16%; border-radius:12px }
+  .phone{ width:9%; height:9%; right:12%; top:20%; border-radius:6px }
+
+  /* Bedroom shapes */
+  .bed{ width:62%; height:24%; left:18%; bottom:12%; border-radius:18px }
+  .bed::before, .bed::after{ content:""; position:absolute; top:-30%; width:34%; height:55%; background:inherit; border-radius:12px }
+  .bed::before{ left:8% } .bed::after{ right:8% }
+  .wardrobe{ width:20%; height:46%; right:8%; bottom:12%; border-radius:10px }
+
+  /* Bathroom shapes */
+  .bathtub{ width:68%; height:22%; left:16%; bottom:12%; border-radius:999px }
+  .bathtub::after{
+    content:""; position:absolute; right:10%; top:-12%; width:18%; height:18%;
+    border-top-left-radius:999px; border-top-right-radius:999px; border:4px solid var(--slot-outline); border-bottom:none;
+    background:transparent;
   }
 
-  /* --- Decorative built-ins to match references (no images) --- */
-  .living .wall{ background:
-    linear-gradient(180deg, #f8f7fb, #ffffff 54%, #f1f4f9 55%, #e9edf3 100%);
-  }
-  .kitchen .wall{ background:
-    linear-gradient(180deg, #fff8fb, #fff 50%, #f2f5fb 51%, #e9edf3 100%),
-    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,0,0,.03) 40px, rgba(0,0,0,.03) 41px);
-  }
-  .bedroom .wall{ background:
-    linear-gradient(180deg, #fff6f2, #ffffff 52%, #eef1f6 53%, #e7ebf2 100%);
-  }
-  .bathroom .wall{ background:
-    linear-gradient(180deg, #f7fffb, #ffffff 52%, #eef3f7 53%, #e7ebf2 100%),
-    repeating-linear-gradient(0deg, transparent, transparent 34px, rgba(0,0,0,.05) 34px, rgba(0,0,0,.05) 35px);
-  }
-
-  /* Garage overlay */
-  .garage{
-    margin-top:16px; padding:12px 14px; border-radius:12px;
-    border:1px dashed rgba(0,0,0,.15); background:#fff;
-    display:flex; align-items:center; justify-content:space-between; gap:12px;
-  }
-  .badge{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(0,0,0,.1); background:#fff }
+  /* legend */
+  .legend{max-width:880px; margin:10px auto 0; padding:0 16px; color:var(--muted); font-size:14px}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="bar">
-    <h1>🏠 Your House</h1>
-    <div class="actions">
-      <a href="quickstart.html" class="btn secondary">← Back</a>
-      <button id="resetBtn" class="btn ghost">Reset layout</button>
-    </div>
-  </div>
-  <div class="tip">Click a dashed shape to place the item (if you own it). Click again to remove.</div>
+  <a class="btn" href="quickstart.html">← Back</a>
+  <div class="spacer"></div>
+  <button id="reset" class="btn">Reset layout</button>
 </header>
 
-<main class="wrap">
-  <section class="grid">
+<div class="wrap">
+  <div class="house">
+    <div class="rooms">
 
-    <!-- LIVING ROOM -->
-    <div id="room-living" class="room living">
-      <div class="wall"></div>
-      <span class="label">Living Room</span>
-      <div class="stage">
-        <div class="slot sofa"     data-item="furn-sofa"><span class="tag">Sofa</span></div>
-        <div class="slot rug"      data-item="furn-rug"><span class="tag">Rug</span></div>
-        <div class="slot tv"       data-item="furn-tv"><span class="tag">TV</span></div>
-      </div>
+      <!-- LIVING ROOM -->
+      <section class="room" id="room-living">
+        <span class="label">Living Room</span>
+        <div class="stage">
+          <!-- sofa -->
+          <div class="slot sofa" data-item="furn-sofa" data-img="assets/furniture/sofa.png">
+            <span class="hint">Sofa</span><img alt="Sofa">
+          </div>
+          <!-- rug -->
+          <div class="slot rug" data-item="furn-rug" data-img="assets/furniture/rug2.png">
+            <span class="hint">Rug</span><img alt="Rug">
+          </div>
+          <!-- tv -->
+          <div class="slot tv" data-item="furn-tv" data-img="assets/furniture/tv.png">
+            <span class="hint">TV</span><img alt="TV">
+          </div>
+          <!-- coffee table (image optional) -->
+          <div class="slot coffee" data-item="furn-table" data-img="assets/furniture/table.png">
+            <span class="hint">Coffee Table</span><img alt="Table">
+          </div>
+          <!-- cabinet (image optional) -->
+          <div class="slot cabinet" data-item="furn-cabinet" data-img="assets/furniture/cabinet.png">
+            <span class="hint">Cabinet</span><img alt="Cabinet">
+          </div>
+        </div>
+      </section>
+
+      <!-- KITCHEN -->
+      <section class="room" id="room-kitchen">
+        <span class="label">Kitchen</span>
+        <div class="stage">
+          <div class="slot table" data-item="furn-table" data-img="assets/furniture/table.png">
+            <span class="hint">Table</span><img alt="Table">
+          </div>
+          <div class="slot phone" data-item="furn-phone" data-img="assets/furniture/phone.png">
+            <span class="hint">Phone</span><img alt="Phone">
+          </div>
+        </div>
+      </section>
+
+      <!-- BEDROOM -->
+      <section class="room" id="room-bedroom">
+        <span class="label">Bedroom</span>
+        <div class="stage">
+          <div class="slot bed" data-item="furn-bed" data-img="assets/furniture/bed.png">
+            <span class="hint">Bed</span><img alt="Bed">
+          </div>
+          <div class="slot wardrobe" data-item="furn-wardrobe" data-img="assets/furniture/wardrobe.png">
+            <span class="hint">Wardrobe</span><img alt="Wardrobe">
+          </div>
+        </div>
+      </section>
+
+      <!-- BATHROOM -->
+      <section class="room" id="room-bathroom">
+        <span class="label">Bathroom</span>
+        <div class="stage">
+          <div class="slot bathtub" data-item="furn-bathtub" data-img="assets/furniture/bathtub.png">
+            <span class="hint">Bathtub</span><img alt="Bathtub">
+          </div>
+        </div>
+      </section>
+
     </div>
-
-    <!-- KITCHEN -->
-    <div id="room-kitchen" class="room kitchen">
-      <div class="wall"></div>
-      <span class="label">Kitchen</span>
-      <div class="stage">
-        <div class="slot table"    data-item="furn-table"><span class="tag">Table</span></div>
-        <div class="slot phone"    data-item="furn-phone"><span class="tag">Phone</span></div>
-      </div>
-    </div>
-
-    <!-- BEDROOM -->
-    <div id="room-bedroom" class="room bedroom">
-      <div class="wall"></div>
-      <span class="label">Bedroom</span>
-      <div class="stage">
-        <div class="slot bed"      data-item="furn-bed"><span class="tag">Bed</span></div>
-        <div class="slot wardrobe" data-item="furn-wardrobe"><span class="tag">Wardrobe</span></div>
-      </div>
-    </div>
-
-    <!-- BATHROOM -->
-    <div id="room-bathroom" class="room bathroom">
-      <div class="wall"></div>
-      <span class="label">Bathroom</span>
-      <div class="stage">
-        <div class="slot bathtub"  data-item="furn-bathtub"><span class="tag">Bathtub</span></div>
-      </div>
-    </div>
-
-  </section>
-
-  <div class="garage">
-    <div>
-      <strong>Garage</strong>
-      <span id="garageStatus" class="badge">Locked (buy the Car)</span>
-    </div>
-    <a id="garageBtn" href="garage.html" class="btn" style="display:none">View Garage</a>
   </div>
-</main>
+
+  <p class="legend">Tip: placeholders are shaped like the furniture. Click to place/remove. A piece can be placed only if the user owns its shop item (e.g. <code>own_furn-sofa</code> is <code>1</code> in <code>localStorage</code>).</p>
+</div>
 
 <script>
-  // === Ownership helpers ===
-  function owns(itemId){
-    // server sync already mirrors to localStorage as "own_<id>"
-    return localStorage.getItem("own_" + itemId) === "1";
-  }
+  // ---- Ownership check: works with your existing shop sync ----
+  function owns(itemId){ return localStorage.getItem("own_" + itemId) === "1"; }
 
-  // Persist placed layout per user
+  // Persist per-user layout
   const user = (localStorage.getItem("playerName") || "").trim();
   const STORE_KEY = "house_layout_" + user;
 
-  function loadLayout(){
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); }
-    catch { return {}; }
-  }
-  function saveLayout(state){
-    localStorage.setItem(STORE_KEY, JSON.stringify(state));
-  }
+  function loadLayout(){ try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); } catch { return {}; } }
+  function saveLayout(state){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 
-  // Apply saved placements
   const state = loadLayout();
+
+  // Init all slots
   document.querySelectorAll(".slot").forEach(slot => {
     const id = slot.dataset.item;
+    const imgPath = slot.dataset.img;
+    const img = slot.querySelector("img");
+    if (imgPath) img.src = imgPath;
+
+    // restore saved placement
     if (state[id]) slot.classList.add("placed");
-    slot.addEventListener("click", () => onSlotClick(slot));
+
+    slot.addEventListener("click", () => {
+      if (!owns(id)) {
+        alert("You don't own this item yet. Buy it in the Shop.");
+        return;
+      }
+      slot.classList.toggle("placed");
+      state[id] = slot.classList.contains("placed");
+      saveLayout(state);
+    }, { passive:true });
   });
 
-  function onSlotClick(el){
-    const id = el.dataset.item;
-    if (!owns(id)) {
-      alert("You don't own this item yet. Buy it in the Shop.");
-      return;
-    }
-    el.classList.toggle("placed");
-    state[id] = el.classList.contains("placed");
-    saveLayout(state);
-  }
-
   // Reset
-  document.getElementById("resetBtn").addEventListener("click", () => {
+  document.getElementById("reset").addEventListener("click", () => {
     if (!confirm("Remove all placed items in your house?")) return;
     document.querySelectorAll(".slot.placed").forEach(s => s.classList.remove("placed"));
     saveLayout({});
   });
-
-  // Garage button visibility
-  const garageBtn = document.getElementById("garageBtn");
-  const garageStatus = document.getElementById("garageStatus");
-  if (owns("car-basic")) {
-    garageBtn.style.display = "inline-flex";
-    garageStatus.textContent = "Unlocked";
-  }
 </script>
+
 </body>
 </html>
