@@ -1,31 +1,21 @@
-<!-- auth-guard.js -->
-<script>
 (function () {
-  // --- PAGES THAT SHOULD BE ACCESSIBLE WITHOUT LOGIN ---
-  // Add/remove filenames here as needed.
+  // PAGES THAT DO NOT REQUIRE LOGIN (keep this list short)
+  // If you want the home page blocked too, do NOT include "index.html".
   const ALLOW_ANON = new Set([
-    "",                     // root (e.g. / or /index.html)
-    "index.html",
     "login.html",
     "register.html",
-    "verified.html",
     "reset-password.html",
-    "privacy.html",
-    "terms.html",
-    "cookies.html",
-    "about.html",
-    "site.webmanifest",
-    "favicon.ico"
+    "verified.html",
   ]);
 
-  // Helper: current page filename (no querystring)
+  // Helper: current page filename (no query string)
   function currentPage() {
     const path = (location.pathname || "/").toLowerCase();
-    const file = path.split("/").pop();     // "" if trailing slash
-    return file || "index.html";
+    const file = path.split("/").pop();   // "" if trailing slash
+    return file || "index.html";          // treat "/" as index.html
   }
 
-  // Helper: is logged in per your current scheme
+  // Helper: your “logged in” test
   function isLoggedIn() {
     try {
       const name = (localStorage.getItem("playerName") || "").trim();
@@ -34,29 +24,26 @@
     } catch { return false; }
   }
 
-  // Allow page-level opt-out by setting: <body data-allow-anon="1">
-  const bodyAllowsAnon = document?.body?.getAttribute?.("data-allow-anon") === "1";
+  // Optional per-page opt-out: <body data-allow-anon="1">
   const page = currentPage();
+  const bodyAllowsAnon =
+    document?.body?.getAttribute?.("data-allow-anon") === "1";
 
-  // If this page is not in the allowlist and body doesn't opt-out,
-  // require the user to be logged in.
+  // Enforce login on all non-allowed pages
   if (!ALLOW_ANON.has(page) && !bodyAllowsAnon) {
     if (!isLoggedIn()) {
-      // Optional: preserve where they were going
       const redir = encodeURIComponent(location.pathname + location.search);
-      location.replace(`login.html?next=${redir}`);
+      location.replace(`/login.html?next=${redir}`);
       return;
     }
   }
 
-  // Bonus: if the user logs out in another tab, bounce them
+  // If the user logs out in another tab, kick them off protected pages
   window.addEventListener("storage", (e) => {
     if (e.key === "playerName" || e.key === "playerAvatar") {
-      // Only enforce on protected pages
       if (!ALLOW_ANON.has(currentPage()) && !isLoggedIn()) {
-        location.replace("login.html");
+        location.replace("/login.html");
       }
     }
   });
 })();
-</script>
