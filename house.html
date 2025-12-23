@@ -1,391 +1,307 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Your House – Credit Quest</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css"/>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>My House — Credit Quest</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="stylesheet" href="style.css"><!-- optional: your site styles -->
 
-  <style>
-    :root { --gap: 14px; }
-    body{
-      margin:0; font-family: Fredoka, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
-      background:#f7fafc;
-    }
-    header{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:14px 16px; background:#00c4cc; color:#00343d;
-    }
-    header h1{ margin:0; font-size:1.25rem; }
-    header .actions{ display:flex; gap:8px; }
-    header button, .room button.inline{
-      background:#fff; border:1px solid #dcdcdc; border-radius:10px; padding:8px 12px; cursor:pointer;
-    }
+<style>
+  :root{
+    --ink:#0b1220;
+    --muted:#6b7280;
+    --panel:#f8fafc;
+    --panel-2:#eef2f7;
+    --brand:#00c4cc;
+    --accent:#4f46e5;
+    --slot: #cfe7ff;
+    --slot-outline: #6aa3ff;
+    --placed:#8fd46a;
+    --wall:#f3f4f6;
+    --floor:#e9edf3;
+  }
+  *{box-sizing:border-box}
 
-    /* Grid of rooms */
-    .house{
-      max-width:1200px; margin:18px auto; padding:0 var(--gap);
-      display:grid; grid-template-columns: 1fr 1fr; gap: var(--gap);
-    }
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    background:
+      radial-gradient(80% 60% at 50% -10%, #ffffff 0, #f6fbff 40%, #eef6ff 100%);
+    color:var(--ink);
+  }
 
-    .room{
-      position:relative;
-      aspect-ratio: 16 / 10;         /* modern browsers */
-      min-height: 260px;              /* <- fallback so you always see a box */
-      background:#eef2f6;             /* visible even if image fails */
-      border-radius:16px; overflow:hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,.08);
-      border:1px solid rgba(0,0,0,.08);
-    }
-    
-    /* background image as an <img> so a broken path is obvious */
-    .room .room-bg{
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      object-fit:cover; object-position:center;
-      display:block;
-    }
+  header{
+    position:sticky; top:0; z-index:10;
+    backdrop-filter:saturate(1.2) blur(6px);
+    background:rgba(255,255,255,.75);
+    border-bottom:1px solid rgba(0,0,0,.06);
+  }
+  .bar{
+    max-width:1100px; margin:0 auto; padding:12px 16px;
+    display:flex; gap:12px; align-items:center; justify-content:space-between;
+  }
+  .bar h1{ font-size:18px; margin:0; letter-spacing:.2px }
+  .bar .actions{ display:flex; gap:8px; flex-wrap:wrap }
+  button, .btn{
+    appearance:none; border:0; border-radius:10px; padding:10px 14px;
+    background:var(--accent); color:#fff; font-weight:600; cursor:pointer;
+    box-shadow:0 6px 14px rgba(79,70,229,.18);
+  }
+  .btn.secondary{ background:#fff; color:#1f2937; border:1px solid rgba(0,0,0,.08) }
+  .btn.ghost{ background:transparent; color:#1f2937 }
+  .tip{ color:var(--muted); font-size:14px; margin:12px auto 0; max-width:1100px; padding:0 16px 10px }
 
-    .room .label{
-      position:absolute; left:10px; top:10px;
-      background: rgba(255,255,255,.85);
-      padding:4px 8px; border-radius:999px; font-size:.9rem;
-      border:1px dashed #bbb;
-    }
+  /* ----- GRID LAYOUT ----- */
+  .wrap{ max-width:1100px; margin:10px auto 34px; padding:0 16px }
+  .grid{
+    display:grid; gap:14px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  @media (max-width: 860px){
+    .grid{ grid-template-columns: 1fr; }
+  }
 
-    /* Placement layer */
-    .room .stage{
-      position:absolute; inset:0;
-    }
+  /* ----- ROOM CARD ----- */
+  .room{
+    position:relative;
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 10px 28px rgba(2,12,50,.08);
+    border:1px solid rgba(0,0,0,.06);
+    min-height:300px;
+  }
+  .room .label{
+    position:absolute; left:14px; top:12px;
+    font-weight:700; font-size:14px; letter-spacing:.4px;
+    background:rgba(255,255,255,.9);
+    border:1px solid rgba(0,0,0,.06);
+    padding:6px 10px; border-radius:999px;
+  }
+  .wall{
+    position:absolute; inset:0;
+    background:
+      linear-gradient(180deg, var(--wall), #ffffff 45%, var(--floor) 46%, #e7ebf2 100%);
+  }
+  /* subtle skylight + depth */
+  .wall::after{
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(60% 40% at 70% -10%, rgba(255,255,255,.85), transparent 55%),
+      linear-gradient(180deg, transparent 0 62%, rgba(0,0,0,.04) 62%, transparent 80%);
+    pointer-events:none;
+  }
 
-    /* Placeholder base style (shape comes from the SVG path) */
-    .slot{
-      position:absolute;
-      cursor:pointer;
-      opacity:.9;
-      transition: transform .15s ease;
-    }
-    .slot:hover{ transform: scale(1.03); }
+  /* stage is where pieces live (above walls) */
+  .stage{ position:absolute; inset:0; padding:18px; }
 
-    /* The dashed outline look */
-    .slot svg{
-      width:100%; height:100%;
-      stroke:#5c6b7a; stroke-width:3; stroke-dasharray:8 6;
-      fill: rgba(92, 107, 122, .10);
-      filter: drop-shadow(0 1px 0 rgba(0,0,0,.06));
-    }
+  /* ----- SLOTS (placeholders) ----- */
+  .slot{
+    position:absolute;
+    outline:2px dashed var(--slot-outline);
+    background: repeating-linear-gradient(
+      45deg, var(--slot), var(--slot) 8px, rgba(255,255,255,.8) 8px, rgba(255,255,255,.8) 16px
+    );
+    box-shadow: inset 0 0 0 4px rgba(255,255,255,.8);
+    transition: transform .12s ease, box-shadow .12s ease;
+    cursor:pointer;
+  }
+  .slot:hover{ transform: translateY(-1px); box-shadow: inset 0 0 0 4px #fff, 0 6px 16px rgba(0,0,0,.08); }
+  .slot .tag{ position:absolute; bottom:-28px; left:0; right:0; margin:auto; text-align:center; font-size:12px; color:var(--muted) }
 
-    /* When an item is placed, we show the PNG instead of the dashed path */
-    .placed{
-      position:absolute; user-select:none; touch-action:none; cursor:grab;
-    }
-    .placed:active{ cursor:grabbing; }
+  /* After placement */
+  .slot.placed{
+    outline-color: transparent;
+    background: var(--placed);
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.9), 0 10px 20px rgba(49,129,27,.18);
+  }
 
-    /* Small legend */
-    .legend{
-      max-width:1200px; margin:0 auto 14px; padding:0 var(--gap);
-      color:#556; font-size:.95rem;
-    }
+  /* ---- Specific shapes (pure CSS) ---- */
 
-    /* Mobile */
-    @media (max-width: 880px){
-      .house{ grid-template-columns: 1fr; }
-    }
-  </style>
+  /* LIVING ROOM */
+  /* Sofa: pill seat + rounded back via pseudo */
+  .slot.sofa{ width:58%; height:22%; left:20%; bottom:12%; border-radius:26px/20px; }
+  .slot.sofa::before{
+    content:""; position:absolute; left:6%; right:6%; top:-35%;
+    height:140%; border-radius:26px/30px; background:inherit; outline:inherit;
+  }
+  .slot.rug{ width:64%; height:18%; left:18%; bottom:6%; border-radius:999px; }
+  .slot.tv{ width:46%; height:12%; right:8%; top:14%; border-radius:12px }
+  .slot.tv::after{
+    content:""; position:absolute; left:45%; bottom:-12px; width:10%; height:12px; background:inherit; border-radius:4px;
+  }
+
+  /* KITCHEN */
+  .slot.table{ width:42%; height:18%; left:10%; bottom:14%; border-radius:14px }
+  .slot.table::after{
+    content:""; position:absolute; left:10%; right:10%; bottom:-14px; height:14px;
+    background:inherit; border-radius:4px;
+  }
+  .slot.phone{ width:9%; height:8%; right:15%; top:24%; border-radius:6px }
+
+  /* BEDROOM */
+  .slot.bed{ width:62%; height:24%; left:18%; bottom:12%; border-radius:18px }
+  .slot.bed::before, .slot.bed::after{
+    content:""; position:absolute; top:-30%; width:34%; height:55%;
+    background:inherit; border-radius:12px;
+  }
+  .slot.bed::before{ left:8%; }
+  .slot.bed::after{ right:8%; }
+  .slot.wardrobe{ width:18%; height:42%; right:8%; bottom:16%; border-radius:10px }
+
+  /* BATHROOM */
+  .slot.bathtub{ width:64%; height:22%; left:18%; bottom:12%; border-radius:999px }
+  .slot.bathtub::after{
+    content:""; position:absolute; right:10%; top:-10%; width:18%; height:18%;
+    border-top-left-radius:999px; border-top-right-radius:999px;
+    border:4px solid var(--slot-outline);
+    border-bottom:none; background:transparent;
+  }
+
+  /* --- Decorative built-ins to match references (no images) --- */
+  .living .wall{ background:
+    linear-gradient(180deg, #f8f7fb, #ffffff 54%, #f1f4f9 55%, #e9edf3 100%);
+  }
+  .kitchen .wall{ background:
+    linear-gradient(180deg, #fff8fb, #fff 50%, #f2f5fb 51%, #e9edf3 100%),
+    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,0,0,.03) 40px, rgba(0,0,0,.03) 41px);
+  }
+  .bedroom .wall{ background:
+    linear-gradient(180deg, #fff6f2, #ffffff 52%, #eef1f6 53%, #e7ebf2 100%);
+  }
+  .bathroom .wall{ background:
+    linear-gradient(180deg, #f7fffb, #ffffff 52%, #eef3f7 53%, #e7ebf2 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 34px, rgba(0,0,0,.05) 34px, rgba(0,0,0,.05) 35px);
+  }
+
+  /* Garage overlay */
+  .garage{
+    margin-top:16px; padding:12px 14px; border-radius:12px;
+    border:1px dashed rgba(0,0,0,.15); background:#fff;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .badge{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(0,0,0,.1); background:#fff }
+</style>
 </head>
 <body>
 
 <header>
-  <h1>🏠 Your House</h1>
-  <div class="actions">
-    <button onclick="window.location.href='quickstart.html'">⬅ Back</button>
-    <button onclick="saveLayout()">💾 Save layout</button>
-    <button onclick="resetLayout()">↺ Reset</button>
+  <div class="bar">
+    <h1>🏠 Your House</h1>
+    <div class="actions">
+      <a href="quickstart.html" class="btn secondary">← Back</a>
+      <button id="resetBtn" class="btn ghost">Reset layout</button>
+    </div>
   </div>
+  <div class="tip">Click a dashed shape to place the item (if you own it). Click again to remove.</div>
 </header>
 
-<p class="legend">
-  Tip: Click a dashed shape to place your furniture. You must own the item from the Shop first.
-  Drag items to reposition. Your layout is saved on this device.
-</p>
+<main class="wrap">
+  <section class="grid">
 
-<div id="house" class="house">
-  <!-- LIVING ROOM -->
-  <section id="room-living" class="room">
-    <img class="room-bg" src="assets/house/rooms/livingroom.jpg" alt="Living room">
-    <span class="label">Living Room</span>
-    <div class="stage"></div>
-    <!-- slots stay the same -->
-  </section>
-
-
-    <!-- Sofa placeholder (rounded sofa silhouette) -->
-    <div class="slot" data-slot="sofa" title="Sofa"
-         style="left:10%; bottom:8%; width:38%; height:30%;">
-      <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-        <path d="M10,35 Q10,20 25,20 H75 Q90,20 90,35 V45 Q90,52 82,52 H18 Q10,52 10,45 Z
-                 M22,25 Q22,15 35,15 H45 Q58,15 58,25
-                 M55,25 Q55,15 70,15 H78 Q88,15 88,25" />
-      </svg>
+    <!-- LIVING ROOM -->
+    <div id="room-living" class="room living">
+      <div class="wall"></div>
+      <span class="label">Living Room</span>
+      <div class="stage">
+        <div class="slot sofa"     data-item="furn-sofa"><span class="tag">Sofa</span></div>
+        <div class="slot rug"      data-item="furn-rug"><span class="tag">Rug</span></div>
+        <div class="slot tv"       data-item="furn-tv"><span class="tag">TV</span></div>
+      </div>
     </div>
 
-    <!-- TV placeholder (old TV silhouette – fits your tv.png) -->
-    <div class="slot" data-slot="tv" title="TV"
-         style="right:8%; top:12%; width:22%; height:28%;">
-      <svg viewBox="0 0 100 100">
-        <rect x="8" y="22" rx="6" ry="6" width="84" height="60"></rect>
-        <line x1="28" y1="10" x2="50" y2="24"></line>
-        <line x1="72" y1="10" x2="50" y2="24"></line>
-        <rect x="42" y="82" width="16" height="6" rx="2"></rect>
-      </svg>
+    <!-- KITCHEN -->
+    <div id="room-kitchen" class="room kitchen">
+      <div class="wall"></div>
+      <span class="label">Kitchen</span>
+      <div class="stage">
+        <div class="slot table"    data-item="furn-table"><span class="tag">Table</span></div>
+        <div class="slot phone"    data-item="furn-phone"><span class="tag">Phone</span></div>
+      </div>
     </div>
 
-    <!-- Rug placeholder (ellipse) -->
-    <div class="slot" data-slot="rug" title="Rug"
-         style="left:28%; bottom:2%; width:44%; height:18%;">
-      <svg viewBox="0 0 100 50">
-        <ellipse cx="50" cy="25" rx="46" ry="18"></ellipse>
-      </svg>
-    </div>
-  </section>
-
-  <!-- KITCHEN -->
-  <section id="room-kitchen" class="room">
-    <img class="room-bg" src="assets/house/rooms/kitchen.jpg" alt="Kitchen">
-    <span class="label">Kitchen</span>
-    <div class="stage"></div>
-    …
-  </section>
-
-    <!-- Mobile Phone placeholder (countertop-ish rounded rect) -->
-    <div class="slot" data-slot="phone" title="Mobile Phone"
-         style="left:50%; top:40%; width:10%; height:14%;">
-      <svg viewBox="0 0 100 160">
-        <rect x="12" y="8" width="76" height="144" rx="12" ry="12"></rect>
-      </svg>
+    <!-- BEDROOM -->
+    <div id="room-bedroom" class="room bedroom">
+      <div class="wall"></div>
+      <span class="label">Bedroom</span>
+      <div class="stage">
+        <div class="slot bed"      data-item="furn-bed"><span class="tag">Bed</span></div>
+        <div class="slot wardrobe" data-item="furn-wardrobe"><span class="tag">Wardrobe</span></div>
+      </div>
     </div>
 
-    <!-- Table placeholder -->
-    <div class="slot" data-slot="table" title="Table"
-         style="left:14%; bottom:8%; width:26%; height:22%;">
-      <svg viewBox="0 0 120 80">
-        <rect x="8" y="12" width="104" height="40" rx="6"></rect>
-        <rect x="18" y="52" width="10" height="20"></rect>
-        <rect x="92" y="52" width="10" height="20"></rect>
-      </svg>
-    </div>
-  </section>
-
-  <!-- BEDROOM -->
-  <section id="room-bedroom" class="room">
-    <img class="room-bg" src="assets/house/rooms/bedroom.jpg" alt="Bedroom">
-    <span class="label">Bedroom</span>
-    <div class="stage"></div>
-    …
-  </section>
-
-    <!-- Bed placeholder (your bed.png proportions) -->
-    <div class="slot" data-slot="bed" title="Bed"
-         style="left:12%; bottom:6%; width:60%; height:34%;">
-      <svg viewBox="0 0 120 70">
-        <rect x="6" y="22" width="108" height="36" rx="6"></rect>
-        <rect x="6" y="14" width="108" height="12" rx="4"></rect>
-        <rect x="6" y="8" width="108" height="8" rx="3"></rect>
-      </svg>
+    <!-- BATHROOM -->
+    <div id="room-bathroom" class="room bathroom">
+      <div class="wall"></div>
+      <span class="label">Bathroom</span>
+      <div class="stage">
+        <div class="slot bathtub"  data-item="furn-bathtub"><span class="tag">Bathtub</span></div>
+      </div>
     </div>
 
-    <!-- Wardrobe placeholder -->
-    <div class="slot" data-slot="wardrobe" title="Wardrobe"
-         style="right:6%; bottom:10%; width:20%; height:50%;">
-      <svg viewBox="0 0 80 160">
-        <rect x="6" y="8" width="68" height="144" rx="6"></rect>
-        <line x1="40" y1="8" x2="40" y2="152"></line>
-      </svg>
-    </div>
   </section>
 
-  <!-- BATHROOM -->
-  <section id="room-bathroom" class="room">
-    <img class="room-bg" src="assets/house/rooms/bathroom.jpg" alt="Bathroom">
-    <span class="label">Bathroom</span>
-    <div class="stage"></div>
-    …
-  </section>
-
-    <!-- Bathtub placeholder -->
-    <div class="slot" data-slot="bathtub" title="Bathtub"
-         style="left:50%; bottom:8%; width:44%; height:30%;">
-      <svg viewBox="0 0 140 80">
-        <path d="M10,30 Q10,18 24,18 H116 Q130,18 130,30 V45 Q130,58 116,58 H24 Q10,58 10,45 Z" />
-        <circle cx="40" cy="62" r="6"></circle>
-        <circle cx="100" cy="62" r="6"></circle>
-      </svg>
+  <div class="garage">
+    <div>
+      <strong>Garage</strong>
+      <span id="garageStatus" class="badge">Locked (buy the Car)</span>
     </div>
-  </section>
-</div>
+    <a id="garageBtn" href="garage.html" class="btn" style="display:none">View Garage</a>
+  </div>
+</main>
 
 <script>
-/* ------------ CONFIG ------------ */
-const FRONT_ITEMS = {
-  sofa:    { itemId: 'furn-sofa',     img: 'assets/house/items/sofa.png',    w: 420, h: 250 },
-  tv:      { itemId: 'furn-tv',       img: 'assets/house/items/tv.png',      w: 260, h: 220 },
-  rug:     { itemId: 'furn-rug',      img: 'assets/house/items/rug2.png',    w: 500, h: 180 },
-  phone:   { itemId: 'furn-phone',    img: 'assets/house/items/phone.png',   w: 120, h: 200 },
-  table:   { itemId: 'furn-table',    img: 'assets/house/items/table.png',   w: 280, h: 200 },
-  bed:     { itemId: 'furn-bed',      img: 'assets/house/items/bed.png',     w: 640, h: 360 },
-  wardrobe:{ itemId: 'furn-wardrobe', img: 'assets/house/items/wardrobe.png',w: 260, h: 520 },
-  bathtub: { itemId: 'furn-bathtub',  img: 'assets/house/items/bathtub.png', w: 520, h: 260 },
-};
+  // === Ownership helpers ===
+  function owns(itemId){
+    // server sync already mirrors to localStorage as "own_<id>"
+    return localStorage.getItem("own_" + itemId) === "1";
+  }
 
-// key under which we store positions per device
-const LAYOUT_KEY = 'house_layout_v1';
+  // Persist placed layout per user
+  const user = (localStorage.getItem("playerName") || "").trim();
+  const STORE_KEY = "house_layout_" + user;
 
-/* ------------ HELPERS ------------ */
-function owns(itemId){
-  // your shop sets "own_<id>" to "1" on purchase
-  return localStorage.getItem('own_' + itemId) === '1';
-}
+  function loadLayout(){
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); }
+    catch { return {}; }
+  }
+  function saveLayout(state){
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }
 
-function loadLayout(){
-  try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}'); }
-  catch { return {}; }
-}
-
-function saveLayout(){
-  const state = {};
-  document.querySelectorAll('.placed').forEach(el => {
-    const roomId = el.closest('.room').id;
-    const slot   = el.dataset.slot;
-    state[roomId] = state[roomId] || {};
-    state[roomId][slot] = {
-      left: el.style.left, top: el.style.top, width: el.style.width
-    };
+  // Apply saved placements
+  const state = loadLayout();
+  document.querySelectorAll(".slot").forEach(slot => {
+    const id = slot.dataset.item;
+    if (state[id]) slot.classList.add("placed");
+    slot.addEventListener("click", () => onSlotClick(slot));
   });
-  localStorage.setItem(LAYOUT_KEY, JSON.stringify(state));
-  alert('✅ Layout saved!');
-}
 
-function resetLayout(){
-  if (!confirm('Reset layout on this device?')) return;
-  localStorage.removeItem(LAYOUT_KEY);
-  document.querySelectorAll('.placed').forEach(n => n.remove());
-  document.querySelectorAll('.slot').forEach(n => n.style.display = '');
-}
-
-/* ------------ INIT: wire slots ------------ */
-document.querySelectorAll('.slot').forEach(slot => {
-  const slotKey = slot.dataset.slot;
-  const meta = FRONT_ITEMS[slotKey];
-  slot.addEventListener('click', () => {
-    if (!meta) return;
-
-    if (!owns(meta.itemId)) {
-      alert(`You don't own the ${slotKey} yet. Buy it in the 🛍️ Shop first.`);
+  function onSlotClick(el){
+    const id = el.dataset.item;
+    if (!owns(id)) {
+      alert("You don't own this item yet. Buy it in the Shop.");
       return;
     }
-    // Hide the dashed placeholder & place the image
-    placeItem(slot, meta);
-  });
-});
-
-function placeItem(slotEl, meta){
-  const roomEl = slotEl.closest('.room');
-  const stage  = roomEl.querySelector('.stage');
-
-  // If already placed, just reveal/make draggable
-  const existing = stage.querySelector(`.placed[data-slot="${slotEl.dataset.slot}"]`);
-  if (existing){ existing.style.display='block'; slotEl.style.display='none'; return; }
-
-  const img = new Image();
-  img.src = meta.img;
-  img.alt = slotEl.dataset.slot;
-  img.className = 'placed';
-  img.dataset.slot = slotEl.dataset.slot;
-  // Size the image to roughly the placeholder box
-  const rect = slotEl.getBoundingClientRect();
-  const parent = stage.getBoundingClientRect();
-  const wPct = (rect.width / parent.width) * 100;
-  const leftPct = ((rect.left - parent.left) / parent.width) * 100;
-  const topPct  = ((rect.top  - parent.top ) / parent.height) * 100;
-
-  Object.assign(img.style, {
-    position:'absolute', width: wPct + '%',
-    left: leftPct + '%', top: topPct + '%'
-  });
-
-  stage.appendChild(img);
-  slotEl.style.display = 'none';
-  makeDraggable(img);
-}
-
-/* ------------ DRAG / POSITION ------------ */
-function makeDraggable(el){
-  let startX=0,startY=0, baseLeft=0, baseTop=0, dragging=false;
-
-  const down = (e)=>{
-    dragging=true; el.style.cursor='grabbing';
-    const p = pointer(e);
-    startX = p.x; startY = p.y;
-    const rect = el.getBoundingClientRect();
-    const pr   = el.parentElement.getBoundingClientRect();
-    baseLeft = ((rect.left - pr.left) / pr.width) * 100;
-    baseTop  = ((rect.top  - pr.top ) / pr.height) * 100;
-    e.preventDefault();
-  };
-
-  const move = (e)=>{
-    if(!dragging) return;
-    const p = pointer(e);
-    const pr = el.parentElement.getBoundingClientRect();
-    const dx = ((p.x - startX) / pr.width) * 100;
-    const dy = ((p.y - startY) / pr.height) * 100;
-    el.style.left = (baseLeft + dx) + '%';
-    el.style.top  = (baseTop  + dy) + '%';
-  };
-
-  const up = ()=>{
-    dragging=false; el.style.cursor='grab';
-  };
-
-  el.addEventListener('mousedown', down);
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', up);
-  el.addEventListener('touchstart', down, {passive:false});
-  window.addEventListener('touchmove', move, {passive:false});
-  window.addEventListener('touchend', up);
-}
-
-function pointer(e){
-  if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  return { x: e.clientX, y: e.clientY };
-}
-
-/* ------------ Rehydrate from saved layout ------------ */
-(function hydrate(){
-  const state = loadLayout();
-  for (const roomId in state){
-    const roomEl = document.getElementById(roomId);
-    if (!roomEl) continue;
-    const stage = roomEl.querySelector('.stage');
-    for (const slot in state[roomId]){
-      const meta = FRONT_ITEMS[slot];
-      const pos = state[roomId][slot];
-      // show only if still owned
-      if (!meta || !owns(meta.itemId)) continue;
-
-      const img = new Image();
-      img.src = meta.img; img.alt = slot; img.className='placed'; img.dataset.slot = slot;
-      Object.assign(img.style, { position:'absolute', left: pos.left, top: pos.top, width: pos.width || '30%' });
-      stage.appendChild(img);
-      makeDraggable(img);
-      // hide placeholder for this slot
-      const ph = roomEl.querySelector(`.slot[data-slot="${slot}"]`);
-      if (ph) ph.style.display='none';
-    }
+    el.classList.toggle("placed");
+    state[id] = el.classList.contains("placed");
+    saveLayout(state);
   }
-})();
+
+  // Reset
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if (!confirm("Remove all placed items in your house?")) return;
+    document.querySelectorAll(".slot.placed").forEach(s => s.classList.remove("placed"));
+    saveLayout({});
+  });
+
+  // Garage button visibility
+  const garageBtn = document.getElementById("garageBtn");
+  const garageStatus = document.getElementById("garageStatus");
+  if (owns("car-basic")) {
+    garageBtn.style.display = "inline-flex";
+    garageStatus.textContent = "Unlocked";
+  }
 </script>
 </body>
 </html>
-
