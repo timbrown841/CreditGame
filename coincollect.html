@@ -145,6 +145,14 @@
     max-width: 980px;    /* adjust if you want */
   }
 }
+
+	  /* Push the Moon/Levels/Music controls well below the HUD on phones */
+@media (max-width: 768px){
+  .top-right{
+    top: 110px;   /* ~4+ "spaces" under the HUD; adjust 96–130px to taste */
+    right: 12px;
+  }
+}
 	
   </style>
 </head>
@@ -1307,6 +1315,7 @@ function drawFinishFlags(){
 </script>
 </body>
 </html>
+
 
 
 
