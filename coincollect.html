@@ -126,7 +126,28 @@
 	box-shadow: 0 16px 60px #000c;
 	}
 
+	/* Phones: move the top-right buttons BELOW the HUD and tighten spacing */
+@media (max-width: 768px){
+  /* keep HUD above the buttons */
+  .hud{ z-index: 8; }
 
+  .top-right{
+    position: fixed;
+    right: 10px;
+    /* place under the HUD (12px top + ~44px HUD height + safe area) */
+    top: calc(12px + 44px + env(safe-area-inset-top));
+    flex-wrap: wrap;     /* allow wrapping on narrow screens */
+    gap: 6px;
+    max-width: 48vw;     /* keep them from spanning the whole row */
+    z-index: 7;          /* under HUD */
+  }
+
+  /* slightly smaller buttons so everything fits nicely */
+  .tiny{
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+}
 	
   </style>
 </head>
@@ -1289,5 +1310,6 @@ function drawFinishFlags(){
 </script>
 </body>
 </html>
+
 
 
