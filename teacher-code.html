@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Enter Teacher Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body class="container" data-allow-anon="1">
+  <h1>Enter Your Teacher Code</h1>
+  <p>Your school provided a code to unlock the app.</p>
+
+  <form id="codeForm" style="max-width:420px">
+    <input id="codeInput" type="text" required placeholder="e.g. ABC123"
+           style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px">
+    <button type="submit" style="margin-top:10px;">Claim Code</button>
+  </form>
+
+  <p id="msg" style="margin-top:10px;"></p>
+
+  <script>
+    const apiBase = "https://credit-api-uhou.onrender.com";
+    const codeForm = document.getElementById("codeForm");
+    const codeInput = document.getElementById("codeInput");
+    const msg = document.getElementById("msg");
+
+    // We stored this when login told us a code was required
+    const pendingUser = (localStorage.getItem("playerNamePending") || "").trim();
+    if (!pendingUser) {
+      // If no pending username, bounce back to login
+      window.location.href = "login.html";
+    }
+
+    codeForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "Checking code...";
+      msg.style.color = "#555";
+
+      try {
+        const res = await fetch(apiBase + "/teacher-code/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: pendingUser,
+            code: codeInput.value
+          })
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.message || payload.error || "Could not claim code");
+        }
+
+        // Success: clear the pending state and force the user to log in again
+        localStorage.removeItem("playerNamePending");
+        alert("✅ Code accepted for " + (payload.school || "your class") + ". Please log in again.");
+        window.location.href = "login.html";
+      } catch (err) {
+        msg.style.color = "#d00";
+        msg.textContent = "❌ " + (err.message || "Invalid code");
+      }
+    });
+  </script>
+</body>
+</html>
