@@ -15,7 +15,12 @@ const app = express();
 app.set("trust proxy", 1);   // ← add this line
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({ origin: ["https://creditquest.co.uk"], credentials: false }));
+
+app.use(express.json({ limit: "1mb" }));
+
+app.use(express.static(path.join(__dirname, "public")));
+
 app.use(express.json({ limit: "1mb" }));
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -55,7 +60,7 @@ function buildVerifyURL(req, token, email) {
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "https://creditquest.onrender.com";
 
 function buildResetURL(req, token, email) {
-  // always send users to the frontend page (not the API)
+  // Send users to the API-hosted static page (we serve /reset-password.html here)
   const base = APP_BASE_URL || `${req.protocol}://${req.get("host")}`; // API base
   return `${base}/reset-password.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 }
@@ -162,6 +167,11 @@ const UserSchema = new mongoose.Schema({
     medium: { type: [String], default: [] },
     hard:   { type: [String], default: [] },
   },
+	// 🔹 Teacher code linkage (NEW)
+  teacherCodeId:        { type: mongoose.Schema.Types.ObjectId, ref: "TeacherCode", default: null },
+  teacherCodeClaimedAt: { type: Date, default: null },
+  schoolName:           { type: String, default: "" },
+	
 }, { versionKey: false });
 
 // (Optional) case-insensitive uniqueness via collation at collection level
@@ -189,6 +199,65 @@ const QuestionSchema = new mongoose.Schema(
   { versionKey: false }
 );
 const Question = mongoose.model("Question", QuestionSchema);
+
+/* ---------- Teacher codes ---------- */
+const TeacherCodeSchema = new mongoose.Schema({
+  code:       { type: String, unique: true, required: true }, // e.g. ABC123
+  name:       { type: String, default: "" },                   // school/class label
+  maxSeats:   { type: Number, default: 30 },
+  seatsUsed:  { type: Number, default: 0 },
+  active:     { type: Boolean, default: true },
+  expiresAt:  { type: Date, default: null },
+  notes:      { type: String, default: "" },
+}, { versionKey:false, timestamps: true }); // 👈 add this
+
+TeacherCodeSchema.index({ code: 1 }, { unique: true });
+
+const TeacherCode = mongoose.model("TeacherCode", TeacherCodeSchema);
+
+/* ---------- Claim teacher code ---------- */
+app.post("/teacher-code/claim", async (req, res) => {
+  try {
+    const { username, code } = req.body || {};
+    if (!username || !code) return res.status(400).send("username and code required");
+
+    const user = await ciFind(User, username);
+    if (!user) return res.status(404).send("User not found");
+
+    // Already claimed?
+    if (user.teacherCodeId) {
+      return res.status(400).json({ error: "already_claimed", message: "A teacher code is already linked to this account." });
+    }
+
+    const t = await TeacherCode.findOne({ code: String(code).trim().toUpperCase() });
+    if (!t) return res.status(400).json({ error: "invalid_code", message: "That code is not valid." });
+    if (!t.active) return res.status(400).json({ error: "inactive_code", message: "This code is not active." });
+    if (t.expiresAt && t.expiresAt < new Date()) {
+      return res.status(400).json({ error: "expired_code", message: "This code has expired." });
+    }
+    if (t.seatsUsed >= t.maxSeats) {
+      return res.status(400).json({ error: "no_seats", message: "This code has reached its limit." });
+    }
+
+    // Atomic seat claim
+    const updated = await TeacherCode.findOneAndUpdate(
+      { _id: t._id, seatsUsed: { $lt: t.maxSeats }, active: true },
+      { $inc: { seatsUsed: 1 } },
+      { new: true }
+    );
+    if (!updated) return res.status(409).json({ error: "race_condition", message: "Seats just ran out. Try another code." });
+
+    user.teacherCodeId = t._id;
+    user.teacherCodeClaimedAt = new Date();
+    user.schoolName = t.name || "";
+    await user.save();
+
+    return res.json({ ok: true, school: user.schoolName || "", code: t.code });
+  } catch (e) {
+    console.error("teacher-code/claim error:", e);
+    return res.status(500).send("Server error");
+  }
+});
 
 /* ---------- Utils ---------- */
 const norm = (s) => String(s || "").trim();
@@ -523,34 +592,42 @@ app.post("/login", async (req, res) => {
     const match = await bcrypt.compare(String(password), user.password);
     if (!match) return res.status(401).send("Incorrect password");
 
+    // 1) Require email verification first
     if (!user.isVerified) {
-  try {
-    // Ensure there is a valid (non-expired) token
-    const now = Date.now();
-    let token   = user.verificationToken;
-    let expires = user.verificationExpires;
+      try {
+        const now = Date.now();
+        let token   = user.verificationToken;
+        let expires = user.verificationExpires;
 
-    if (!token || !expires || expires.getTime() < now) {
-      token = crypto.randomBytes(32).toString("hex");
-      expires = new Date(now + 24 * 60 * 60 * 1000); // 24h
-      user.verificationToken = token;
-      user.verificationExpires = expires;
-      await user.save();
+        if (!token || !expires || expires.getTime() < now) {
+          token = crypto.randomBytes(32).toString("hex");
+          expires = new Date(now + 24 * 60 * 60 * 1000);
+          user.verificationToken = token;
+          user.verificationExpires = expires;
+          await user.save();
+        }
+
+        const verifyURL = buildVerifyURL(req, token, user.email);
+        await sendVerificationEmail(user.email, user.username, verifyURL);
+      } catch (e) {
+        console.error("Login-triggered verification email failed:", e);
+      }
+
+      return res.status(403).json({
+        error: "not_verified",
+        message: "We just sent you a new verification email. Please check your inbox."
+      });
     }
 
-    const verifyURL = buildVerifyURL(req, token, user.email);
-    await sendVerificationEmail(user.email, user.username, verifyURL);
-  } catch (e) {
-    console.error("Login-triggered verification email failed:", e);
-    // we still return 403 below
-  }
+    // 2) Then require a teacher code (if you want the whole app gated)
+    if (!user.teacherCodeId) {
+      return res.status(403).json({
+        error: "teacher_code_required",
+        message: "Your teacher code is required before you can play."
+      });
+    }
 
-  return res.status(403).json({
-    error: "not_verified",
-    message: "We just sent you a new verification email. Please check your inbox."
-  });
-}
-
+    // 3) Success
     return res.json({
       username: user.username,
       email:    user.email,
@@ -560,11 +637,38 @@ app.post("/login", async (req, res) => {
       trailId:      user.trailId || "",
       themeId:      user.themeId || "",
       boosterUntil: user.boosterUntil || 0,
+      hasTeacherCode: !!user.teacherCodeId
     });
   } catch (err) {
     console.error("Login error:", err);
     return res.status(500).send("Login failed");
   }
+});
+
+// Create a new teacher code
+app.post("/admin/teacher-codes", async (req, res) => {
+  if (!basicAuthOk(req)) return res.status(401).send("Auth required");
+  const { code, name, maxSeats, expiresAt, active } = req.body || {};
+  if (!code) return res.status(400).send("code required");
+  try {
+    const doc = await TeacherCode.create({
+      code: String(code).trim().toUpperCase(),
+      name: name || "",
+      maxSeats: Math.max(1, Number(maxSeats || 30)),
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      active: active !== false
+    });
+    res.json({ ok: true, code: doc.code, id: doc._id });
+  } catch (e) {
+    res.status(400).send(String(e.message || e));
+  }
+});
+
+// List codes
+app.get("/admin/teacher-codes", async (req, res) => {
+  if (!basicAuthOk(req)) return res.status(401).send("Auth required");
+  const list = await TeacherCode.find({}).sort({ createdAt: -1 }).lean();
+  res.json(list);
 });
 
 app.post("/submit-score", async (req, res) => {
@@ -854,13 +958,6 @@ app.post("/admin/questions/generate", async (req, res) => {
   const pref = Array.isArray(tags) ? tags.map((t) => String(t).toLowerCase()) : [];
   const made = await generateQuestionsBatch(level, count, pref);
   res.json({ ok: true, made });
-});
-
-// in server.js, above app.listen(...)
-app.get("/reset-password", (req, res) => {
-  // simply redirect to the static page with the same query
-  const q = new URLSearchParams(req.query).toString();
-  res.redirect(`/reset-password.html${q ? `?${q}` : ""}`);
 });
 
 /* ---------- Start ---------- */
