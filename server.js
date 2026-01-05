@@ -62,10 +62,11 @@ function buildResetURL(req, token, email) {
   return `${base}/reset-password.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 }
 
+// --- Password reset email ---
 async function sendPasswordResetEmail(toEmail, username, url) {
   const payload = {
     sender: {
-      email: process.env.MAIL_FROM_EMAIL,            // e.g. support@creditquest.co.uk
+      email: process.env.MAIL_FROM_EMAIL,
       name:  process.env.MAIL_FROM_NAME || "Credit Quest",
     },
     to: [{ email: toEmail, name: username || toEmail }],
@@ -96,11 +97,12 @@ async function sendPasswordResetEmail(toEmail, username, url) {
   }
 }
 
+// --- Verification email ---
 async function sendVerificationEmail(toEmail, username, url) {
   const payload = {
     sender: {
       email: process.env.MAIL_FROM_EMAIL,
-      name: process.env.MAIL_FROM_NAME || "Credit Quest",
+      name:  process.env.MAIL_FROM_NAME || "Credit Quest",
     },
     to: [{ email: toEmail, name: username || toEmail }],
     subject: "Verify your Credit Quest account",
@@ -115,17 +117,27 @@ async function sendVerificationEmail(toEmail, username, url) {
     `,
   };
 
+  const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
-    console.error("Admin email send failed:", resp.status, text);
+    throw new Error(`Brevo send failed: ${resp.status} ${text}`);
   }
 }
 
-/* ---- Place helpers BELOW (top-level, not nested) ---- */
+/* ===== Admin alert helpers (top-level, NOT inside sendVerificationEmail) ===== */
 function getAdminRecipients() {
-  const list = String(process.env.ADMIN_ALERT_EMAILS || "").split(",")
-    .map(s => s.trim()).filter(Boolean);
-  // fallback to MAIL_FROM_EMAIL so you still see alerts in dev
+  const list = String(process.env.ADMIN_ALERT_EMAILS || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
   if (!list.length && process.env.MAIL_FROM_EMAIL) list.push(process.env.MAIL_FROM_EMAIL);
   return list;
 }
@@ -153,18 +165,22 @@ async function sendAdminEmail(subject, html) {
     body: JSON.stringify(payload),
   });
 
-// throttle so we don't spam you
-function shouldThrottle(date, minutes = 1440) { // default 24h
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    console.error("Admin email send failed:", resp.status, text);
+  }
+}
+
+// avoid spamming
+function shouldThrottle(date, minutes = 1440) {
   if (!date) return false;
-  return (Date.now() - new Date(date).getTime()) < minutes*60*1000;
+  return (Date.now() - new Date(date).getTime()) < minutes * 60 * 1000;
 }
 
 async function notifyTeacherCodeRequired(user, reason = "needs_code") {
   try {
-    if (shouldThrottle(user.needsCodeNotifiedAt, 720)) { // 12h throttle
-      return;
-    }
-    const profileUrl = `https://credit-api-uhou.onrender.com/admin/users?u=${encodeURIComponent(user.username)}`;
+    if (shouldThrottle(user.needsCodeNotifiedAt, 720)) return; // 12h throttle
+
     const html = `
       <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;line-height:1.5">
         <h3>Teacher code needed</h3>
@@ -172,9 +188,8 @@ async function notifyTeacherCodeRequired(user, reason = "needs_code") {
         <p><strong>Reason:</strong> ${reason}</p>
         <p><strong>School:</strong> ${user.schoolName || "(none yet)"} </p>
         <p style="margin-top:10px">
-          • Create or reuse a code:<br>
-          <code>POST /admin/teacher-codes</code><br>
-          • Share the code with the school/class.<br>
+          • Create or reuse a code: <code>POST /admin/teacher-codes</code><br>
+          • Share the code with the school/class.
         </p>
       </div>
     `;
@@ -184,21 +199,6 @@ async function notifyTeacherCodeRequired(user, reason = "needs_code") {
     await user.save();
   } catch (e) {
     console.error("notifyTeacherCodeRequired error:", e);
-  }
-}
-
-  const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "api-key": process.env.BREVO_API_KEY,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Brevo send failed: ${resp.status} ${text}`);
   }
 }
 
