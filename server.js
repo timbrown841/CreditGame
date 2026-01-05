@@ -958,16 +958,6 @@ app.post("/admin/questions/generate", async (req, res) => {
   res.json({ ok: true, made });
 });
 
-// TEMP: env diag (REMOVE after debugging)
-app.get("/admin/env-diag", (req, res) => {
-  res.json({
-    hasUser: !!process.env.ADMIN_USERNAME,
-    hasPass: !!process.env.ADMIN_PASSWORD,
-    userLen: (process.env.ADMIN_USERNAME || "").length,
-    passLen: (process.env.ADMIN_PASSWORD || "").length
-  });
-});
-
 /* ---------- Start ---------- */
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
