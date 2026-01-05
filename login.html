@@ -108,13 +108,22 @@
     try { payload = JSON.parse(text); } catch { payload = text; }
 
     if (!res.ok) {
-      if (res.status === 403 && payload && payload.error === "not_verified") {
-        alert(payload.message || "Please verify your email before logging in.");
-        return;
-      }
-      const msg = (payload && payload.message) ? payload.message : (typeof payload === "string" ? payload : "Login failed");
-      throw new Error(msg);
-    }
+  if (res.status === 403 && payload && payload.error === "not_verified") {
+    alert(payload.message || "Please verify your email before logging in.");
+    return;
+  }
+
+  if (res.status === 403 && payload && payload.error === "teacher_code_required") {
+    // Store the username so the claim page can use it
+    localStorage.setItem("playerNamePending", username);
+    // Send user to the claim page
+    window.location.href = "teacher-code.html";
+    return;
+  }
+
+  const msg = (payload && payload.message) ? payload.message : (typeof payload === "string" ? payload : "Login failed");
+  throw new Error(msg);
+}
 
     const data = (typeof payload === "string") ? JSON.parse(payload) : payload;
 
