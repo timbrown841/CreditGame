@@ -211,8 +211,6 @@ const TeacherCodeSchema = new mongoose.Schema({
   notes:      { type: String, default: "" },
 }, { versionKey:false, timestamps: true }); // 👈 add this
 
-TeacherCodeSchema.index({ code: 1 }, { unique: true });
-
 const TeacherCode = mongoose.model("TeacherCode", TeacherCodeSchema);
 
 /* ---------- Claim teacher code ---------- */
