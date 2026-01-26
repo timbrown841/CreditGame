@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Earning Money</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="auth-guard.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Page-specific tweaks (keep default site white-on-dark) */
+    :root { --brand:#4f46e5; --soft:rgba(255,255,255,.08); --ring:rgba(79,70,229,.35); }
+    body.earning-money .container{ max-width:1000px; margin:24px auto; padding:0 16px; }
+    .hero { margin: 8px 0 18px; }
+    .pill { display:inline-flex; gap:6px; align-items:center; background:var(--soft); border-radius:999px; padding:6px 10px; font-size:13px; }
+    .grid { display:grid; gap:16px; grid-template-columns: 1fr; }
+    @media (min-width:900px){ .grid { grid-template-columns: 1.1fr .9fr; } }
+    .card { background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px; backdrop-filter: blur(3px); }
+    .card h2 { margin:6px 0 10px; font-size:20px; }
+    .list { display:grid; gap:10px; }
+    .row { display:flex; gap:10px; }
+    .icon { width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:rgba(255,255,255,.12); }
+    .hint { opacity:.85; font-size: 13px; }
+
+    .chat { background: rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.12); border-radius: 16px; padding:12px; }
+    .bubble { max-width: 80%; padding:10px 12px; border-radius: 14px; margin:6px 0; }
+    .you { background: rgba(79,70,229,.25); margin-left:auto; border:1px solid rgba(79,70,229,.45); }
+    .bot { background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); }
+
+    .game { display:grid; gap:12px; }
+    select, input[type="range"], input[type="number"] {
+      width:100%; border-radius:10px; padding:10px 12px; background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.18); color:#fff; outline:none;
+    }
+    select:focus, input:focus { box-shadow: 0 0 0 4px var(--ring); border-color: var(--brand); }
+    .row-split { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .btn { border:none; border-radius:999px; padding:10px 14px; font-weight:600; cursor:pointer; background:var(--brand); color:#fff; }
+    .meter { height:12px; border-radius:999px; background:rgba(255,255,255,.12); overflow:hidden; border:1px solid rgba(255,255,255,.18); }
+    .fill { height:100%; width:0%; background:linear-gradient(90deg, var(--brand), #7c3aed); transition: width .35s ease; }
+    .earnings { font-size:18px; font-weight:700; }
+  </style>
+</head>
+<body class="earning-money">
+  <div class="container">
+    <div class="hero">
+      <h1>💼 Earning Money</h1>
+      <p class="pill">Goal: Money comes from effort, time, and skills</p>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: learning + chat -->
+      <div style="display:grid; gap:16px;">
+        <div class="card">
+          <h2>📚 Key topics</h2>
+          <div class="list">
+            <div class="row"><div class="icon">🏢</div><div><strong>How people earn money</strong><br><span class="hint">Jobs, small businesses, freelancing and gigs.</span></div></div>
+            <div class="row"><div class="icon">🧹</div><div><strong>Pocket money & chores</strong><br><span class="hint">Helping at home to learn value for effort.</span></div></div>
+            <div class="row"><div class="icon">📰</div><div><strong>Age-appropriate work</strong><br><span class="hint">Paper rounds, babysitting, dog-walking, yard work.</span></div></div>
+            <div class="row"><div class="icon">🧮</div><div><strong>Why money isn’t unlimited</strong><br><span class="hint">Adults budget income to cover needs and goals.</span></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>💬 Example interactions</h2>
+          <div class="chat" id="chatBox" aria-live="polite">
+            <div class="bubble bot">Want to try a job and see how pay adds up?</div>
+            <div class="bubble you">Yes — I’ll try a paper round!</div>
+            <div class="bubble bot">Great! Choose hours and your skill level, then start a shift.</div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <input id="chatInput" type="text" placeholder="Ask: How can I earn more?" style="flex:1;" />
+            <button class="btn" id="chatSend">Send</button>
+          </div>
+          <p class="hint" style="margin-top:6px;">Try asking about hourly pay, tipping, or improving skills.</p>
+        </div>
+      </div>
+
+      <!-- RIGHT: mini-game -->
+      <div class="card">
+        <h2>🎮 Mini game: Work a shift → earn coins</h2>
+        <div class="game">
+          <label>Choose a job
+            <select id="jobSelect">
+              <option value="paper">📰 Paper Round — ~£5/hr</option>
+              <option value="babysit">🧸 Babysitting — ~£7/hr</option>
+              <option value="dog">🐕 Dog Walking — ~£6/hr</option>
+              <option value="yard">🧹 Yard/Garden — ~£6/hr</option>
+              <option value="tutor">📘 Tutoring — ~£10/hr</option>
+            </select>
+          </label>
+
+          <div class="row-split">
+            <label>Hours (1–4)
+              <input type="number" id="hours" min="1" max="4" step="1" value="2">
+            </label>
+            <label>Skill (1–5): <span id="skillOut">3</span>
+              <input type="range" id="skill" min="1" max="5" value="3">
+            </label>
+          </div>
+
+          <div>
+            <div class="meter"><div id="shiftFill" class="fill"></div></div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
+              <button class="btn" id="startShiftBtn">Start Shift</button>
+              <div class="earnings">+£<span id="earnOut">0</span></div>
+            </div>
+            <p class="hint" id="earnHint">Tip: Higher skill slightly boosts your pay. Longer hours = more earnings.</p>
+          </div>
+
+          <div style="margin-top:8px;">
+            <a href="quickstart.html"><button class="btn" style="background:#22c55e;">Back to Quickstart</button></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Chat bits (simple canned replies) ---
+    const el = id => document.getElementById(id);
+    const chatBox = el('chatBox'), chatInput = el('chatInput'), chatSend = el('chatSend');
+    const replies = (t) => {
+      t = t.toLowerCase();
+      if (t.includes('more') || t.includes('earn')) return 'Improve skills, increase hours safely, or pick higher-paying jobs as you grow.';
+      if (t.includes('tip') || t.includes('tipping')) return 'Great service can lead to tips (where appropriate), but not all jobs have tips.';
+      if (t.includes('skill')) return 'Practice, reliability, and friendliness boost your “skill” and may raise pay over time.';
+      if (t.includes('hour')) return 'Hourly pay × hours = total. But balance school, rest, and safety.';
+      return 'Try asking about hourly pay, tipping, or improving skills.';
+    };
+    function pushChat(text, who='bot'){ const d=document.createElement('div'); d.className='bubble '+(who==='you'?'you':'bot'); d.textContent=text; chatBox.appendChild(d); chatBox.scrollTop=chatBox.scrollHeight; }
+    function sendChat(){ const t=chatInput.value.trim(); if(!t) return; pushChat(t,'you'); chatInput.value=''; setTimeout(()=>pushChat(replies(t),'bot'),300); }
+    chatSend.addEventListener('click', sendChat);
+    chatInput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+    // --- Mini game logic ---
+    const username = (localStorage.getItem('playerName') || '').trim();
+    const coinDisplay = document.getElementById('coinDisplay'); // if present on page
+    const jobs = {
+      paper:   { name:'Paper Round', rate:5 },
+      babysit: { name:'Babysitting', rate:7 },
+      dog:     { name:'Dog Walking', rate:6 },
+      yard:    { name:'Yard/Garden', rate:6 },
+      tutor:   { name:'Tutoring', rate:10 },
+    };
+    const jobSelect = el('jobSelect'), hours = el('hours'), skill = el('skill'), skillOut = el('skillOut');
+    const startBtn = el('startShiftBtn'), earnOut = el('earnOut'), fill = el('shiftFill'), earnHint = el('earnHint');
+
+    skill.addEventListener('input', ()=>{ skillOut.textContent = skill.value; });
+
+    function calcPay() {
+      const job = jobs[jobSelect.value];
+      const h = Math.max(1, Math.min(4, Number(hours.value||1)));
+      const s = Math.max(1, Math.min(5, Number(skill.value||3)));
+      const base = job.rate * h;
+      const bonus = Math.round(base * (s-1) * 0.06); // up to ~24% at skill 5
+      return Math.max(1, base + bonus);
+    }
+
+    async function rewardCoins(amount){
+      if(!username) return;
+      try {
+        await fetch('/reward-coins', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ username, amount })
+        });
+      } catch(e){ /* ignore — still show local animation */ }
+    }
+
+    startBtn.addEventListener('click', async ()=>{
+      const pay = calcPay();
+      earnOut.textContent = '0';
+      fill.style.width = '0%';
+      startBtn.disabled = true;
+      earnHint.textContent = 'Working your shift…';
+      // Animate “shift” progress & earnings
+      const steps = 30; let n=0;
+      const inc = Math.max(1, Math.round(pay/steps));
+      const timer = setInterval(()=>{
+        n++; const pct = Math.min(100, Math.round((n/steps)*100));
+        fill.style.width = pct + '%';
+        const shown = Math.min(pay, (Number(earnOut.textContent)||0) + inc);
+        earnOut.textContent = shown;
+        if (n>=steps){ clearInterval(timer); earnOut.textContent = pay; startBtn.disabled = false; earnHint.textContent = `Nice shift! You earned about £${pay}.`;
+          rewardCoins(pay); // attempt to add coins on server
+        }
+      }, 35);
+    });
+  </script>
+</body>
+</html>
