@@ -1,0 +1,329 @@
+<!-- File: spending-smart.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Spending Smart</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="auth-guard.js"></script>
+
+  <!-- Site styles -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    :root {
+      --card-bg:#fff; --ink:#111; --muted:#6b7280; --brand:#4f46e5; --ok:#22c55e; --warn:#ef4444; --soft:#f3f4f6;
+      --ring: rgba(79,70,229,.25);
+    }
+    body { font-family: Fredoka, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+
+    .page-title { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+    .page-title h1 { margin:0; font-size: 28px; color:#fff; }           /* white title over bg */
+    .subtitle { color:#fff; margin:0 0 18px; opacity:.9; }              /* white subtitle */
+
+    .grid { display:grid; gap:16px; grid-template-columns: 1fr; }
+    @media (min-width:900px){ .grid { grid-template-columns: 1.1fr .9fr; } }
+
+    .card {
+      background: var(--card-bg); border-radius: 16px; padding:16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+      border:1px solid #e5e7eb; color: var(--ink);
+    }
+    .card h2 { margin:4px 0 8px; font-size:20px; }
+    .pill { display:inline-flex; gap:6px; align-items:center; background:rgba(255,255,255,.2); border-radius:999px; padding:6px 10px; font-size:13px; color:#fff; border:1px solid rgba(255,255,255,.35); }
+    .list { display:grid; gap:10px; }
+    .list .row { display:flex; gap:10px; }
+    .list .row .icon { width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:#eef2ff; }
+
+    /* Inputs & buttons */
+    input[type="number"], input[type="text"] {
+      border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; font-size:14px; width:100%;
+      outline:none; transition: box-shadow .15s ease, border-color .15s ease;
+    }
+    input:focus { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
+    .btn { border:none; border-radius: 999px; padding:10px 14px; font-weight:600; cursor:pointer; background:var(--brand); color:#fff; }
+    .btn.ghost { background:#fff; color:#111; border:1px solid #e5e7eb; }
+    .btn.ok { background: var(--ok); }
+    .btn.warn { background: var(--warn); }
+
+    .row-inline { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    /* Best deal table */
+    .deal-grid { display:grid; grid-template-columns: 1fr 110px 110px 110px; gap:8px; align-items:center; }
+    .deal-grid .head { font-weight:600; }
+    .unit { font-weight:700; }
+    .best { outline: 2px solid var(--ok); border-radius:8px; padding:4px 6px; }
+
+    /* Rip-off game */
+    .offers { display:grid; gap:10px; }
+    .offer {
+      border:1px solid #eceff3; border-radius:12px; padding:10px;
+      display:flex; justify-content:space-between; align-items:center; background:#f9fafb;
+    }
+    .offer.bad { box-shadow: 0 0 0 2px rgba(239,68,68,.15) inset; }
+    .offer.good { box-shadow: 0 0 0 2px rgba(34,197,94,.15) inset; }
+    .badge { font-size:12px; background:#eef2ff; border:1px solid #e5e7eb; padding:4px 8px; border-radius:14px; }
+    .score { font-weight:700; }
+  </style>
+</head>
+
+<body class="spending-smart">
+  <div class="container">
+    <div class="page-title">
+      <h1>🛒 Spending Smart</h1>
+      <span class="pill">Year 7 • Financial Decisions</span>
+    </div>
+    <p class="subtitle">Make clever spending choices: compare deals, spot tricks, and plan before you buy.</p>
+
+    <div class="grid">
+      <!-- LEFT: learning + interactions -->
+      <div class="stack" style="display:grid; gap:16px;">
+        <div class="card">
+          <h2>🧠 Key ideas</h2>
+          <div class="list">
+            <div class="row">
+              <div class="icon">🔍</div>
+              <div><strong>Compare prices</strong><br><span class="hint">Work out the unit price (e.g. p per 100g) to find the best value.</span></div>
+            </div>
+            <div class="row">
+              <div class="icon">🏷️</div>
+              <div><strong>Discounts ≠ always cheaper</strong><br><span class="hint">“Was £10” might be a trick. Check today’s unit price.</span></div>
+            </div>
+            <div class="row">
+              <div class="icon">📝</div>
+              <div><strong>Plan your spend</strong><br><span class="hint">Impulse buys eat your budget. Make a simple list first.</span></div>
+            </div>
+            <div class="row">
+              <div class="icon">🤝</div>
+              <div><strong>Need vs want</strong><br><span class="hint">Ask: Do I need it now? Will I still want it next week?</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>💬 Example interactions</h2>
+          <div class="row-inline">
+            <input id="askInput" type="text" placeholder="Try: Is 2 for £3 a good deal?" />
+            <button class="btn" id="askBtn">Ask</button>
+          </div>
+          <div id="answerBox" class="hint" style="margin-top:8px;">Tip: Ask about comparing packs, ‘save 20%’ deals, or impulse buying.</div>
+        </div>
+
+        <div class="card">
+          <h2>🧪 “Best deal” comparison challenge</h2>
+          <p class="hint">Enter price & size for up to three options. We’ll compute unit price and highlight the best value.</p>
+          <div class="deal-grid" style="margin-top:8px;">
+            <div></div><div class="head">Price (£)</div><div class="head">Size</div><div class="head">Unit price</div>
+
+            <div>Option A</div>
+            <input id="pA" type="number" step="0.01" placeholder="2.50">
+            <input id="sA" type="text" placeholder="500 g">
+            <div id="uA" class="unit">—</div>
+
+            <div>Option B</div>
+            <input id="pB" type="number" step="0.01" placeholder="3.00">
+            <input id="sB" type="text" placeholder="750 g">
+            <div id="uB" class="unit">—</div>
+
+            <div>Option C</div>
+            <input id="pC" type="number" step="0.01" placeholder="1.80">
+            <input id="sC" type="text" placeholder="300 g">
+            <div id="uC" class="unit">—</div>
+          </div>
+          <div class="row-inline" style="margin-top:10px;">
+            <button class="btn ok" id="calcBtn">Calculate</button>
+            <button class="btn ghost" id="clearBtn">Clear</button>
+            <span id="bestMsg" class="hint"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: games + nav -->
+      <div class="stack" style="display:grid; gap:16px;">
+        <div class="card">
+          <h2>🕵️ Spot-the-rip-off</h2>
+          <p class="hint">Choose the trickiest “deal”. You get a point for spotting the rip-off!</p>
+          <div id="roundBox" class="offers" style="margin-top:8px;"></div>
+          <div class="row-inline" style="margin-top:10px; justify-content:space-between;">
+            <div>Score: <span id="ripScore" class="score">0</span></div>
+            <div class="right">
+              <button id="newRoundBtn" class="btn">New round</button>
+              <button id="resetRipBtn" class="btn ghost">Reset score</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>🔙 Back to game</h2>
+          <p class="hint">Ready to put it into practice?</p>
+          <a href="quickstart.html"><button class="btn">Back to Quickstart</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Namespacing per user
+    const username = (localStorage.getItem('playerName') || '').trim();
+    const NS = (k) => `spendSmart:${username}:${k}`;
+
+    /* ---------- Example interactions ---------- */
+    const askInput = document.getElementById('askInput');
+    const askBtn   = document.getElementById('askBtn');
+    const answerBox= document.getElementById('answerBox');
+
+    function reply(q) {
+      const t = q.toLowerCase();
+      if (t.includes('2 for') || t.includes('3 for') || t.includes('deal')) {
+        return 'Work out the unit price: total price ÷ total size. Deals are only good if the unit price is lower.';
+      }
+      if (t.includes('impulse') || t.includes('list')) {
+        return 'Impulse buys: wait 24 hours. If you still want it and it fits your budget, go ahead.';
+      }
+      if (t.includes('discount') || t.includes('%') || t.includes('offer')) {
+        return 'Check the new unit price. “Save 20%” isn’t helpful if the final price is still higher than a competitor.';
+      }
+      if (t.includes('need') || t.includes('want')) {
+        return 'Ask: Do I need it now? Will I still use it in a month? Needs first, wants planned.';
+      }
+      return 'Try comparing two pack sizes. I’ll help you compute unit price.';
+    }
+    askBtn.addEventListener('click', () => {
+      const q = askInput.value.trim();
+      if (!q) return;
+      answerBox.textContent = reply(q);
+      localStorage.setItem(NS('lastQ'), q);
+    });
+
+    /* ---------- Best deal calculator ---------- */
+    const inputs = {
+      pA: document.getElementById('pA'), sA: document.getElementById('sA'), uA: document.getElementById('uA'),
+      pB: document.getElementById('pB'), sB: document.getElementById('sB'), uB: document.getElementById('uB'),
+      pC: document.getElementById('pC'), sC: document.getElementById('sC'), uC: document.getElementById('uC'),
+    };
+    const bestMsg = document.getElementById('bestMsg');
+
+    // parse sizes like "500 g", "1 kg", "2 L", "750 ml", returns quantity in base units (g or ml)
+    function parseSize(s) {
+      const m = String(s || '').trim().toLowerCase().match(/^([\d.]+)\s*(kg|g|l|ml)$/i);
+      if (!m) return null;
+      const qty = parseFloat(m[1]);
+      const unit = m[2];
+      if (unit === 'kg') return { qty: qty * 1000, unit: 'g' };
+      if (unit === 'g')  return { qty, unit: 'g' };
+      if (unit === 'l')  return { qty: qty * 1000, unit: 'ml' };
+      if (unit === 'ml') return { qty, unit: 'ml' };
+      return null;
+    }
+
+    function calcUnit(price, sizeStr) {
+      const sz = parseSize(sizeStr);
+      if (!sz || !(price > 0) || !(sz.qty > 0)) return null;
+      const per100 = (price / sz.qty) * 100; // price per 100 g/ml
+      return { per100, unit: sz.unit };
+    }
+
+    function formatUnit(u) {
+      return u ? `£${u.per100.toFixed(2)} / 100 ${u.unit}` : '—';
+    }
+
+    function clearHighlights() {
+      ['uA','uB','uC'].forEach(id => document.getElementById(id).classList.remove('best'));
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', () => {
+      clearHighlights();
+      const A = calcUnit(parseFloat(inputs.pA.value), inputs.sA.value);
+      const B = calcUnit(parseFloat(inputs.pB.value), inputs.sB.value);
+      const C = calcUnit(parseFloat(inputs.pC.value), inputs.sC.value);
+
+      inputs.uA.textContent = formatUnit(A);
+      inputs.uB.textContent = formatUnit(B);
+      inputs.uC.textContent = formatUnit(C);
+
+      const arr = [{k:'uA', v:A},{k:'uB', v:B},{k:'uC', v:C}].filter(x=>x.v);
+      if (!arr.length) { bestMsg.textContent = 'Enter price and size (e.g., 500 g or 1 L).'; return; }
+
+      const best = arr.reduce((m,x)=> x.v.per100 < m.v.per100 ? x : m);
+      document.getElementById(best.k).classList.add('best');
+      bestMsg.textContent = '✅ Best value highlighted (lowest price per 100 g/ml).';
+      localStorage.setItem(NS('lastBest'), JSON.stringify({A,B,C}));
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      ['pA','pB','pC','sA','sB','sC'].forEach(id => inputs[id].value = '');
+      ['uA','uB','uC'].forEach(id => document.getElementById(id).textContent = '—');
+      clearHighlights(); bestMsg.textContent = '';
+      localStorage.removeItem(NS('lastBest'));
+    });
+
+    /* ---------- Spot-the-rip-off game ---------- */
+    const roundBox = document.getElementById('roundBox');
+    const ripScoreEl = document.getElementById('ripScore');
+    const newRoundBtn = document.getElementById('newRoundBtn');
+    const resetRipBtn = document.getElementById('resetRipBtn');
+
+    let ripScore = parseInt(localStorage.getItem(NS('ripScore')) || '0', 10);
+    ripScoreEl.textContent = ripScore;
+
+    function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+    function makeRound() {
+      roundBox.innerHTML = '';
+      const base = rand(3,8); // base price
+      // Build 3 offers; one of them will be a “rip-off”
+      const offers = [
+        { name: 'Brand A', price: base, badge: 'Everyday price', legit:true },
+        { name: 'Brand B', price: +(base*0.9).toFixed(2), badge: '10% off', legit:true },
+        { name: 'Brand C', price: +(base*1.05).toFixed(2), badge: 'WAS £' + (base*1.4).toFixed(2), legit:false } // likely rip-off anchor
+      ];
+      // Shuffle
+      offers.sort(()=>Math.random()-0.5);
+
+      offers.forEach((o,i) => {
+        const row = document.createElement('div');
+        row.className = 'offer';
+        row.innerHTML = `
+          <div><strong>${o.name}</strong><br><span class="hint">Today: £${o.price.toFixed(2)}</span></div>
+          <div class="badge">${o.badge}</div>
+          <button class="btn ghost" data-i="${i}">Pick</button>
+        `;
+        roundBox.appendChild(row);
+      });
+
+      roundBox.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = +btn.getAttribute('data-i');
+          const chosen = offers[idx];
+          // mark all
+          roundBox.querySelectorAll('.offer').forEach((node, j) => {
+            node.classList.add(offers[j].legit ? 'good' : 'bad');
+          });
+          if (!chosen.legit) {
+            ripScore += 1;
+            ripScoreEl.textContent = ripScore;
+            localStorage.setItem(NS('ripScore'), String(ripScore));
+            btn.textContent = '✅ Correct';
+            btn.className = 'btn ok';
+          } else {
+            btn.textContent = '❌ Not the rip-off';
+            btn.className = 'btn warn';
+          }
+        });
+      });
+    }
+
+    newRoundBtn.addEventListener('click', makeRound);
+    resetRipBtn.addEventListener('click', () => {
+      ripScore = 0; ripScoreEl.textContent = '0'; localStorage.setItem(NS('ripScore'),'0');
+      makeRound();
+    });
+
+    // First load
+    makeRound();
+  </script>
+</body>
+</html>
