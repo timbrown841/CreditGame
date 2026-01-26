@@ -1,0 +1,301 @@
+<!-- File: banking-basics.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Banking Basics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="auth-guard.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    :root{
+      --card-bg:#fff; --ink:#111; --muted:#6b7280; --brand:#4f46e5; --ok:#22c55e; --warn:#ef4444; --soft:#f3f4f6;
+      --ring: rgba(79,70,229,.25);
+    }
+    body{ font-family: Fredoka, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .container{ max-width:980px; margin:24px auto; padding:0 16px; }
+
+    .page-title{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+    .page-title h1{ margin:0; font-size:28px; color:#fff; } /* white title */
+    .subtitle{ color:#fff; margin:0 0 18px; opacity:.9; }   /* white subtitle */
+    .pill{ display:inline-flex; gap:6px; align-items:center; background:rgba(255,255,255,.2); border-radius:999px; padding:6px 10px; font-size:13px; color:#fff; border:1px solid rgba(255,255,255,.35); }
+
+    .grid{ display:grid; gap:16px; grid-template-columns:1fr; }
+    @media (min-width:900px){ .grid{ grid-template-columns:1.1fr .9fr; } }
+
+    .card{
+      background:var(--card-bg); border-radius:16px; padding:16px;
+      border:1px solid #e5e7eb; box-shadow:0 10px 30px rgba(0,0,0,.06); color:var(--ink);
+    }
+    .card h2{ margin:4px 0 8px; font-size:20px; }
+    .hint{ color:var(--muted); font-size:13px; }
+    .row-inline{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .stack{ display:grid; gap:16px; }
+
+    input[type="number"], input[type="text"]{
+      border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; font-size:14px; width:100%;
+      outline:none; transition: box-shadow .15s ease, border-color .15s ease;
+    }
+    input:focus{ border-color:var(--brand); box-shadow:0 0 0 4px var(--ring); }
+    .btn{ border:none; border-radius:999px; padding:10px 14px; font-weight:600; cursor:pointer; background:var(--brand); color:#fff; }
+    .btn.ghost{ background:#fff; color:#111; border:1px solid #e5e7eb; }
+    .btn.ok{ background:var(--ok); }
+    .btn.warn{ background:var(--warn); }
+
+    /* Ledger */
+    .ledger{ border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; }
+    .ledger .head, .ledger .row{ display:grid; grid-template-columns: 1fr 110px 110px; gap:8px; padding:8px 10px; }
+    .ledger .head{ background:#f3f4f6; font-weight:600; }
+    .ledger .row:nth-child(odd){ background:#fafafa; }
+
+    /* Flow visual */
+    .flow-bar{ height:16px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+    .flow-fill-reserve{ height:100%; width:0%; background:linear-gradient(90deg,#10b981,#34d399); transition:width .35s ease; }
+    .flow-fill-lend{ height:100%; width:0%; background:linear-gradient(90deg,#4f46e5,#7c3aed); transition:width .35s ease; }
+
+    /* ATM safety list */
+    .list{ display:grid; gap:10px; }
+    .row{ display:flex; gap:10px; }
+    .icon{ width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:#eef2ff; }
+    .mini{ font-size:12px; color:var(--muted); }
+  </style>
+</head>
+
+<body class="banking-basics">
+  <div class="container">
+    <div class="page-title">
+      <h1>🏦 Banking Basics</h1>
+      <span class="pill">Year 7 • Everyday Money</span>
+    </div>
+    <p class="subtitle">Demystify banks: what they do, how accounts work, using cards & ATMs safely.</p>
+
+    <div class="grid">
+      <!-- LEFT: Simulator + interactions -->
+      <div class="stack">
+        <!-- Virtual bank account simulator -->
+        <div class="card">
+          <h2>💳 Virtual bank account</h2>
+          <p class="hint">Try deposits, card spends and ATM withdrawals. Advance a week to see interest grow.</p>
+
+          <div class="row-inline" style="justify-content:space-between;">
+            <div><strong>Balance:</strong> £<span id="bal">0.00</span></div>
+            <div class="hint">Interest: <span id="apr">2.0</span>% APR (demo)</div>
+          </div>
+
+          <div class="row-inline" style="margin-top:10px;">
+            <input id="amount" type="number" min="1" step="1" placeholder="Amount £" style="max-width:160px;">
+            <button class="btn ok"   id="depositBtn">Deposit</button>
+            <button class="btn warn" id="withdrawBtn">ATM Withdraw</button>
+            <button class="btn"      id="cardSpendBtn">Card Spend</button>
+            <button class="btn ghost" id="weekBtn">Advance 1 week</button>
+          </div>
+
+          <div class="ledger" style="margin-top:12px;">
+            <div class="head"><div>Note</div><div>Change (£)</div><div>Balance (£)</div></div>
+            <div id="ledgerRows"></div>
+          </div>
+          <p class="mini" style="margin-top:8px;">Note: “Interest” is simplified for learning.</p>
+        </div>
+
+        <!-- Example interactions -->
+        <div class="card">
+          <h2>💬 Example interactions</h2>
+          <div class="row-inline">
+            <input id="qInput" type="text" placeholder="Try: What’s a bank account?" />
+            <button class="btn" id="qBtn">Ask</button>
+          </div>
+          <div id="ans" class="hint" style="margin-top:8px;">Ask about bank accounts, debit cards, or why adults can’t spend forever.</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Explainers + ATM safety + back -->
+      <div class="stack">
+        <!-- What banks do / flow -->
+        <div class="card">
+          <h2>🏗️ What happens to your money in a bank?</h2>
+          <p class="hint">When you deposit money, banks keep some safe (reserve) and lend some out to others. Let’s visualise.</p>
+
+          <div class="row-inline" style="margin-bottom:8px;">
+            <input id="flowAmt" type="number" min="1" step="1" placeholder="Deposit demo £" style="max-width:160px;">
+            <button class="btn" id="flowBtn">Show flow</button>
+          </div>
+
+          <div class="row-inline" style="justify-content:space-between;">
+            <div>Reserve kept: <strong><span id="resPct">20</span>%</strong></div>
+            <div>Lent out: <strong><span id="lendPct">80</span>%</strong></div>
+          </div>
+          <div class="flow-bar" style="margin-top:8px;">
+            <div id="reserveFill" class="flow-fill-reserve"></div>
+          </div>
+          <div class="flow-bar" style="margin-top:8px;">
+            <div id="lendFill" class="flow-fill-lend"></div>
+          </div>
+          <p class="mini" id="flowNote" style="margin-top:8px;"></p>
+        </div>
+
+        <!-- Key topics -->
+        <div class="card">
+          <h2>🧠 Key topics</h2>
+          <div class="list">
+            <div class="row"><div class="icon">🏦</div><div><strong>What banks do</strong><br><span class="hint">Keep money safe, help pay/transfer, and lend to people/businesses.</span></div></div>
+            <div class="row"><div class="icon">💼</div><div><strong>What a bank account is</strong><br><span class="hint">A record of your money. You can pay in, take out, and track it in an app.</span></div></div>
+            <div class="row"><div class="icon">💳</div><div><strong>Debit card vs cash</strong><br><span class="hint">Debit card spends your own money from your account (not borrowing).</span></div></div>
+            <div class="row"><div class="icon">🏧</div><div><strong>Using ATMs safely</strong><br><span class="hint">Cover your PIN, check the slot, be aware of people around you.</span></div></div>
+          </div>
+        </div>
+
+        <!-- ATM safety mini-checklist -->
+        <div class="card">
+          <h2>🔐 ATM safety</h2>
+          <div class="list">
+            <label class="row"><input type="checkbox" id="c1" style="transform:scale(1.2)"> <div>Cover the keypad when typing your PIN.</div></label>
+            <label class="row"><input type="checkbox" id="c2" style="transform:scale(1.2)"> <div>Check the card slot for anything loose/odd.</div></label>
+            <label class="row"><input type="checkbox" id="c3" style="transform:scale(1.2)"> <div>Stand close; keep your card/cash out of sight.</div></label>
+          </div>
+          <div class="row-inline" style="margin-top:10px;">
+            <button class="btn ghost" id="resetATM">Reset</button>
+            <span id="atmMsg" class="hint"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>🔙 Back to game</h2>
+          <a href="quickstart.html"><button class="btn">Back to Quickstart</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Namespaced storage
+    const username = (localStorage.getItem('playerName') || '').trim();
+    const NS = (k) => `bankBasics:${username}:${k}`;
+
+    /* ===== Virtual Bank Account ===== */
+    const balEl   = document.getElementById('bal');
+    const amount  = document.getElementById('amount');
+    const depBtn  = document.getElementById('depositBtn');
+    const wdBtn   = document.getElementById('withdrawBtn');
+    const cardBtn = document.getElementById('cardSpendBtn');
+    const weekBtn = document.getElementById('weekBtn');
+    const ledger  = document.getElementById('ledgerRows');
+    const aprEl   = document.getElementById('apr');
+
+    let balance = parseFloat(localStorage.getItem(NS('balance')) || '0');
+    let apr = 2.0; // demo APR
+    aprEl.textContent = apr.toFixed(1);
+
+    function fmt(n){ return (Math.round(n*100)/100).toFixed(2); }
+
+    function pushRow(note, delta){
+      balance = Math.max(0, balance + delta);
+      balEl.textContent = fmt(balance);
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<div>${note}</div><div>${delta>=0?'+':''}${fmt(delta)}</div><div>${fmt(balance)}</div>`;
+      ledger.prepend(row);
+      localStorage.setItem(NS('balance'), String(balance));
+    }
+
+    depBtn.addEventListener('click', ()=>{
+      const v = Math.max(0, Math.floor(Number(amount.value || 0)));
+      if(!v) return;
+      pushRow('Deposit', v);
+      amount.value = '';
+    });
+
+    wdBtn.addEventListener('click', ()=>{
+      const v = Math.max(0, Math.floor(Number(amount.value || 0)));
+      if(!v) return;
+      const cash = Math.min(v, balance);
+      pushRow('ATM withdraw', -cash);
+      amount.value = '';
+    });
+
+    cardBtn.addEventListener('click', ()=>{
+      const v = Math.max(0, Math.floor(Number(amount.value || 0)));
+      if(!v) return;
+      const spend = Math.min(v, balance);
+      pushRow('Card spend', -spend);
+      amount.value = '';
+    });
+
+    weekBtn.addEventListener('click', ()=>{
+      // simple weekly interest: APR/52 on current balance
+      const weeklyRate = apr/100/52;
+      const interest = balance * weeklyRate;
+      if(interest>0) pushRow('Interest (1 week)', +interest);
+    });
+
+    // First paint
+    balEl.textContent = fmt(balance);
+
+    /* ===== Q&A ===== */
+    const qInput = document.getElementById('qInput');
+    const qBtn   = document.getElementById('qBtn');
+    const ans    = document.getElementById('ans');
+
+    function reply(q){
+      const t = q.toLowerCase();
+      if(t.includes('bank account')) return 'A bank account is a safe record of your money. You can pay in, take out, and track everything.';
+      if(t.includes('debit')) return 'A debit card spends your own money from your account—no borrowing.';
+      if(t.includes('why adults') || t.includes('unlimited')) return 'Adults have limited money because income is limited and bills must be paid first.';
+      if(t.includes('atm') || t.includes('pin')) return 'Cover your PIN, check the slot, and be aware of people around you.';
+      return 'Banks keep money safe, help you pay, and lend to others. Ask me about debit cards or ATMs!';
+    }
+    qBtn.addEventListener('click', ()=>{
+      const q = qInput.value.trim(); if(!q) return;
+      ans.textContent = reply(q);
+    });
+
+    /* ===== Flow explainer ===== */
+    const flowAmt = document.getElementById('flowAmt');
+    const flowBtn = document.getElementById('flowBtn');
+    const reserveFill = document.getElementById('reserveFill');
+    const lendFill = document.getElementById('lendFill');
+    const resPctEl = document.getElementById('resPct');
+    const lendPctEl = document.getElementById('lendPct');
+    const flowNote = document.getElementById('flowNote');
+
+    const RESERVE = 20; // demo %
+    function showFlow(){
+      const v = Math.max(0, Math.floor(Number(flowAmt.value || 0)));
+      const res = Math.round(v * RESERVE/100);
+      const lend = v - res;
+      resPctEl.textContent = RESERVE;
+      lendPctEl.textContent = 100 - RESERVE;
+      reserveFill.style.width = RESERVE + '%';
+      lendFill.style.width = (100 - RESERVE) + '%';
+      if(v>0){
+        flowNote.textContent = `If you deposited £${v}, the bank might keep ~£${res} as reserve and lend ~£${lend} to others (simplified demo).`;
+      } else {
+        flowNote.textContent = '';
+      }
+    }
+    flowBtn.addEventListener('click', showFlow);
+
+    /* ===== ATM checklist ===== */
+    const c1=document.getElementById('c1'), c2=document.getElementById('c2'), c3=document.getElementById('c3');
+    const atmMsg=document.getElementById('atmMsg'), resetATM=document.getElementById('resetATM');
+
+    // restore
+    [c1,c2,c3].forEach((cb,i)=>{
+      cb.checked = localStorage.getItem(NS('atm'+(i+1)))==='1';
+      cb.addEventListener('change', ()=>{
+        localStorage.setItem(NS('atm'+(i+1)), cb.checked?'1':'0');
+        const done = [c1,c2,c3].filter(x=>x.checked).length;
+        atmMsg.textContent = done===3 ? '✅ Great! You’re ATM-safe.' : `Progress: ${done}/3`;
+      });
+    });
+    resetATM.addEventListener('click', ()=>{
+      [c1,c2,c3].forEach((cb,i)=>{ cb.checked=false; localStorage.setItem(NS('atm'+(i+1)),'0'); });
+      atmMsg.textContent='';
+    });
+    // initial msg
+    (function(){ const done=[c1,c2,c3].filter(x=>x.checked).length; if(done) atmMsg.textContent=`Progress: ${done}/3`; })();
+  </script>
+</body>
+</html>
