@@ -67,6 +67,20 @@
     .offer.good { box-shadow: 0 0 0 2px rgba(34,197,94,.15) inset; }
     .badge { font-size:12px; background:#eef2ff; border:1px solid #e5e7eb; padding:4px 8px; border-radius:14px; }
     .score { font-weight:700; }
+
+    /* spending smart comparison grid */
+.deal-grid, .cards, .compare-grid { 
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));  /* responsive cols */
+  gap: 12px;
+}
+
+/* ensure cards can't force horizontal overflow */
+.deal-card, .option-card, .offer-card { 
+  min-width: 0; 
+  max-width: 100%;
+  overflow: hidden;
+}
   </style>
 </head>
 
