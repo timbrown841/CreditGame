@@ -633,4 +633,56 @@ body.banking-basics .card * {
   overflow-wrap: anywhere;
 }
 
+/* --- Page-specific layout reset (fix right-side stacking) --- */
+body.money-basics,
+body.banking-basics{
+  /* kill the global flex + centering from body */
+  display: block !important;
+  text-align: left !important;
+  justify-content: normal !important;
+  align-items: normal !important;
+}
+
+/* Center the main panel, keep it within the viewport */
+body.money-basics .container,
+body.banking-basics .container{
+  width: min(92vw, 980px) !important;
+  margin: 24px auto !important;
+  text-align: left !important;
+}
+
+/* Grids: 1 column on mobile, 2 columns on wide screens */
+body.money-basics .grid,
+body.banking-basics .grid{
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+@media (min-width: 900px){
+  body.money-basics .grid,
+  body.banking-basics .grid{
+    grid-template-columns: 1.1fr .9fr !important;
+  }
+}
+
+/* Cards can’t push width; text stays inside */
+body.money-basics .card,
+body.banking-basics .card{
+  max-width: 100% !important;
+  min-width: 0 !important;
+  text-align: left !important;
+  overflow-wrap: anywhere;
+}
+
+/* Inline rows wrap instead of running sideways */
+body.money-basics .row-inline,
+body.money-basics .goal-row,
+body.banking-basics .row-inline{
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+
+/* Absolute safety: no sideways scroll */
+html, body { overflow-x: hidden !important; }
 
