@@ -686,3 +686,45 @@ body.banking-basics .row-inline{
 /* Absolute safety: no sideways scroll */
 html, body { overflow-x: hidden !important; }
 
+/* === FINAL OVERRIDES: content pages must not be capped at 400px === */
+body.money-basics .container,
+body.banking-basics .container{
+  max-width: 980px !important;            /* lift the 400px cap */
+  width: calc(100% - 32px) !important;    /* keep safe side padding on mobile */
+  margin: 24px auto !important;
+  padding: 16px !important;
+  text-align: left !important;            /* undo global center */
+}
+
+/* Ensure grid doesn’t push sideways and stacks on mobile */
+body.money-basics .grid,
+body.banking-basics .grid{
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+@media (min-width: 900px){
+  body.money-basics .grid.minmax-grid,
+  body.banking-basics .grid.minmax-grid{
+    grid-template-columns: 1.1fr .9fr !important;
+  }
+}
+
+/* Rows must wrap on small screens */
+body.money-basics .row-inline,
+body.money-basics .goal-row,
+body.banking-basics .row-inline{
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+
+/* Cards/text can’t bleed out of their boxes */
+body.money-basics .card,
+body.money-basics .card *,
+body.banking-basics .card,
+body.banking-basics .card *{
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+}
