@@ -528,4 +528,53 @@ html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
 /* images/videos never bleed */
 img, video { max-width: 100%; height: auto; display: block; }
 
+/* --- Page-specific iPhone overflow fixes --- */
+body.money-basics .container,
+body.banking-basics .container {
+  text-align: left;              /* override global body { text-align:center } */
+}
+
+body.money-basics .grid,
+body.banking-basics .grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);  /* single safe column by default */
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  body.money-basics .grid.minmax-grid,
+  body.banking-basics .grid.minmax-grid {
+    grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr);
+  }
+}
+
+/* ensure flex rows cannot force horizontal scroll */
+body.money-basics .row-inline,
+body.money-basics .goal-row,
+body.banking-basics .row-inline {
+  min-width: 0;
+}
+body.money-basics .row-inline > *,
+body.money-basics .goal-row > *,
+body.banking-basics .row-inline > * {
+  min-width: 0;
+}
+
+/* inputs inside inline rows can shrink on small screens */
+body.money-basics .row-inline input,
+body.money-basics .goal-row input,
+body.banking-basics .row-inline input {
+  flex: 1 1 0;
+  max-width: 100%;
+}
+
+/* absolutely prevent children from bleeding outside cards */
+body.money-basics .card, 
+body.money-basics .card *,
+body.banking-basics .card, 
+body.banking-basics .card * {
+  max-width: 100%;
+}
+
+
 
