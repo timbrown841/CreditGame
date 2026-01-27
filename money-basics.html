@@ -21,8 +21,8 @@
     .page-title h1 { margin:0; font-size: 28px; }
     .subtitle { color: var(--muted); margin:0 0 18px; }
 
-    .grid { display:grid; gap:16px; grid-template-columns: 1fr; }
-    @media (min-width:900px){ .grid { grid-template-columns: 1.2fr .8fr; } }
+    /* replace .grid with .grid.minmax-grid in the HTML */
+.grid { gap: 16px; } /* keep if you like */
 
     .card {
       background: var(--card-bg); border-radius: 16px; padding:16px;
@@ -95,7 +95,7 @@
     </div>
     <p class="subtitle">Learn how youth bank accounts work, practice safe choices, and smash your first savings goal.</p>
 
-    <div class="grid">
+    <div class="grid minmax-grid">
       <!-- LEFT: learning + chat -->
       <div class="stack" style="display:grid; gap:16px;">
         <div class="card">
