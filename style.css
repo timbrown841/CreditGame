@@ -576,5 +576,61 @@ body.banking-basics .card * {
   max-width: 100%;
 }
 
+/* Hard stop: do NOT use the game's flex body on these content pages */
+body.money-basics,
+body.banking-basics {
+  display: block;          /* override global body { display:flex } */
+  align-items: initial;    /* neutralize flex centering */
+  justify-content: initial;
+  text-align: left;        /* override global body { text-align:center } */
+}
+
+/* Page-specific container width & safe padding */
+body.money-basics .container,
+body.banking-basics .container {
+  width: min(980px, 100% - 32px);  /* never exceed viewport */
+  margin: 24px auto;
+  padding: 16px;                   /* ensures no edge bleed on iPhone */
+}
+
+/* Grid: clamp widths hard to prevent sideways push */
+body.money-basics .grid,
+body.banking-basics .grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  gap: 16px;
+  max-width: 100%;
+}
+
+@media (min-width: 900px) {
+  body.money-basics .grid.minmax-grid,
+  body.banking-basics .grid.minmax-grid {
+    grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr);
+  }
+}
+
+/* Inline rows: allow children to shrink/wrap instead of pushing off-screen */
+body.money-basics .row-inline,
+body.money-basics .goal-row,
+body.banking-basics .row-inline {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+body.money-basics .row-inline > *,
+body.money-basics .goal-row > *,
+body.banking-basics .row-inline > * {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+/* Absolutely prevent content from bleeding outside cards */
+body.money-basics .card, 
+body.money-basics .card * ,
+body.banking-basics .card, 
+body.banking-basics .card * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 
 
