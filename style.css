@@ -509,3 +509,23 @@ img, video { max-width: 100%; height: auto; }
 /* Utility: prevent long words/URLs from breaking layouts */
 .u-wrap { overflow-wrap: anywhere; word-break: break-word; }
 
+/* --- iPhone overflow fixes --- */
+html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+*, *::before, *::after { box-sizing: border-box; }
+
+/* prevent grid children from forcing the page wider */
+.card, .stack, .row-inline, .goal-row { min-width: 0; }
+
+/* long text/URLs won’t push the layout */
+.u-wrap { overflow-wrap: anywhere; word-break: break-word; }
+
+/* generic fix for grids so columns don't overflow */
+.minmax-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; }
+@media (min-width: 900px) {
+  .minmax-grid { grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr); }
+}
+
+/* images/videos never bleed */
+img, video { max-width: 100%; height: auto; display: block; }
+
+
