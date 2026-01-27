@@ -444,3 +444,68 @@ button:hover {
 
 /* Lock background page scroll while modal is open */
 body.no-scroll{ overflow: hidden; }
+
+/* ===== iPhone / small-screen fixes ===== */
+html { -webkit-text-size-adjust: 100%; }   /* prevent unexpected zooming/resizing */
+body { overflow-x: hidden; }               /* stop sideways scroll on tight layouts */
+
+/* Media: iPhone widths */
+@media (max-width: 430px) {
+  .container { padding: 0 14px; }
+
+  /* Headings/pills wrap nicely */
+  .page-title { flex-wrap: wrap; gap: 8px; }
+  .page-title h1 { font-size: 22px; line-height: 1.15; }
+  .subtitle { font-size: 14px; line-height: 1.35; }
+
+  /* Cards breathe a bit more, avoid edge-to-edge overflow */
+  .card { padding: 14px; border-radius: 14px; }
+
+  /* All grids collapse safely */
+  .grid { display: grid; grid-template-columns: 1fr !important; gap: 12px; }
+
+  /* Inline rows that were cramping / pushing off-screen */
+  .row-inline, .goal-row { 
+    display: grid; 
+    grid-template-columns: 1fr; 
+    gap: 8px; 
+  }
+
+  /* Chat bubbles should never overflow */
+  .chat { max-height: 42vh; overflow:auto; }
+  .bubble { max-width: 90%; word-wrap: break-word; }
+
+  /* Buttons: make them easy to tap */
+  .btn { width: 100%; padding: 12px 14px; }
+
+  /* Inputs: >=16px font to prevent iOS zoom-on-focus */
+  input[type="text"], input[type="number"], input[type="email"], input[type="password"] {
+    font-size: 16px;
+  }
+
+  /* Pills and badges don’t squash the layout */
+  .pill { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Progress bar keeps within bounds */
+  .progress-wrap { height: 14px; }
+}
+
+/* Media: very small devices */
+@media (max-width: 360px) {
+  .page-title h1 { font-size: 20px; }
+  .subtitle { font-size: 13px; }
+}
+
+/* Safe-area padding for iPhones with a notch */
+.safe-inset {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+/* Media assets never overflow */
+img, video { max-width: 100%; height: auto; }
+
+/* Utility: prevent long words/URLs from breaking layouts */
+.u-wrap { overflow-wrap: anywhere; word-break: break-word; }
+
