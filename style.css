@@ -758,3 +758,39 @@ body.banking-basics .ledger .head div:first-child {
   }
 }
 
+/* --- Banking Basics: fix header text clipping on iPhone --- */
+@media (max-width: 430px) {
+  /* Let the ledger content breathe; don't clip wrapped header lines */
+  body.banking-basics .ledger {
+    overflow: visible;              /* was hidden */
+    border-radius: 12px;            /* keep rounded corners */
+  }
+
+  /* Make columns more even + wider; allow wrapping */
+  body.banking-basics .ledger .head,
+  body.banking-basics .ledger .row {
+    grid-template-columns: 1.2fr 0.9fr 0.9fr;  /* wider 2nd/3rd cols than 90/100px */
+    gap: 6px;
+    padding: 6px 8px;                           /* smaller padding so text fits */
+  }
+
+  /* Allow header labels to wrap onto two lines */
+  body.banking-basics .ledger .head div,
+  body.banking-basics .ledger .row > div {
+    white-space: normal;            /* ensure wrapping is allowed */
+    overflow-wrap: anywhere;        /* wrap long words like "Change (£)" if needed */
+    word-break: normal;
+  }
+
+  /* Remove the previous nowrap on the first header cell for small screens */
+  body.banking-basics .ledger .head div:first-child {
+    white-space: normal;
+  }
+
+  /* Slightly smaller header text so labels fit comfortably */
+  body.banking-basics .ledger .head div {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+}
+
