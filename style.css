@@ -728,3 +728,33 @@ body.banking-basics .card *{
   min-width: 0 !important;
   overflow-wrap: anywhere !important;
 }
+
+/* --- Banking Basics: ledger column + wrap fix --- */
+body.banking-basics .ledger .head,
+body.banking-basics .ledger .row {
+  /* keep the first column wide enough to avoid letter-by-letter wrap */
+  grid-template-columns: minmax(120px, 1fr) 110px 110px;
+}
+
+/* restore normal word wrapping inside ledger cells */
+body.banking-basics .ledger .head div,
+body.banking-basics .ledger .row > div {
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: normal;
+}
+
+/* never break the "Note" header across lines */
+body.banking-basics .ledger .head div:first-child {
+  white-space: nowrap;
+}
+
+/* tighten columns on very small screens */
+@media (max-width: 430px) {
+  body.banking-basics .ledger .head,
+  body.banking-basics .ledger .row {
+    grid-template-columns: minmax(140px, 1fr) 90px 100px;
+    gap: 6px;
+  }
+}
+
